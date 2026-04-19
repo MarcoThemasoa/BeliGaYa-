@@ -1,0 +1,6 @@
+{
+  "name": "Saham Analyzer",
+  "description": "Platform analisis valuasi saham Indonesia berbasis P/BV ratio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
