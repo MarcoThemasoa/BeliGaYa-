@@ -212,8 +212,8 @@ Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini per
     <div className="min-h-screen bg-background text-text-main font-sans selection:bg-accent/30 selection:text-accent flex flex-col">
       {/* Header */}
       <header className="h-[72px] border-b border-border-subtle bg-surface px-6 md:px-10 flex items-center justify-between sticky top-0 z-10 shrink-0">
-        <div className="font-serif text-xl md:text-2xl italic tracking-[-0.5px] text-white">
-          Saham Analyzer
+        <div className="font-serif text-xl md:text-2xl italic tracking-[-0.5px] text-accent font-bold">
+          BGY <span className="text-white text-lg font-normal ml-1">(Beli Ga Ya?)</span>
         </div>
         <div className="flex items-center gap-6">
           <span className="hidden md:inline-flex items-center px-3 py-1 bg-surface-light border border-border-subtle rounded-full text-[11px] text-accent tracking-[0.5px]">

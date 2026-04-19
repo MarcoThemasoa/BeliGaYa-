@@ -1,4 +1,4 @@
-# 📈 Saham Analyzer (Mesin Valuasi Saham AI)
+# 📈 BGY (Beli Ga Ya?) - Mesin Valuasi Saham AI
 
 Aplikasi web intelijen pintar (_intelligent web app_) untuk membedah data fundamental dan sentimen analisis saham-saham di Bursa Efek Indonesia (IDX). Aplikasi ini menggabungkan kekuatan pencarian internet _real-time_ dari **Google Gemini** dan klasifikasi Natural Language Processing (NLP) dari **Hugging Face** untuk memberikan wawasan investasi pragmatic hanya dalam hitungan detik.
 

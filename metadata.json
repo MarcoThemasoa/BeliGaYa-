@@ -1,6 +1,6 @@
 {
-  "name": "Saham Analyzer",
-  "description": "Platform analisis valuasi saham Indonesia berbasis P/BV ratio.",
+  "name": "BGY (Beli Ga Ya?)",
+  "description": "Platform analisis valuasi saham Indonesia berbasis AI dan NLP.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
