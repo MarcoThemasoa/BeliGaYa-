@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+.vercel/
+.cache/
+.next/
+out/
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vercel

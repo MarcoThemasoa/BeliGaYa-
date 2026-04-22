@@ -2,10 +2,206 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, Info, TrendingUp, AlertTriangle, CheckCircle, Calculator, Building, Banknote, BrainCircuit, Loader2 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { cn } from './lib/utils';
-import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL = "gemini-3-flash-preview";
+// BACKEND PROXY INTEGRATION (Pengganti FMP)
+// ============================================
+interface StockData {
+  symbol: string;
+  name: string;
+  price: number;
+  bookValuePerShare: number;
+  sector: string;
+}
+
+const fetchStockData = async (searchTicker: string): Promise<StockData | null> => {
+  try {
+    const res = await fetch(`/api/stock/${searchTicker}`);
+    if (!res.ok) {
+      console.warn("Backend mengembalikan error:", res.status);
+      return null;
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("Gagal terhubung ke Backend Proxy:", err);
+    return null;
+  }
+};
+// ============================================
+// CACHING SYSTEM
+// ============================================
+const CACHE_KEY_PREFIX = "bgy_analysis_";
+const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB limit
+
+const calculateCacheSize = (): number => {
+  let size = 0;
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith(CACHE_KEY_PREFIX)) {
+      const item = localStorage.getItem(key);
+      if (item) size += item.length * 2; // 2 bytes per character
+    }
+  });
+  return size;
+};
+
+const pruneOldestCache = (): void => {
+  const entries = Object.keys(localStorage)
+    .filter(key => key.startsWith(CACHE_KEY_PREFIX))
+    .map(key => ({ key, timestamp: JSON.parse(localStorage.getItem(key) || '{}').timestamp || 0 }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  
+  if (entries.length > 0) {
+    localStorage.removeItem(entries[0].key);
+  }
+};
+
+interface CachedAnalysis {
+  data: AnalysisResult;
+  timestamp: number;
+}
+
+const getCacheKey = (ticker: string) => `${CACHE_KEY_PREFIX}${ticker.toUpperCase()}`;
+
+const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
+  try {
+    const cached = localStorage.getItem(getCacheKey(ticker));
+    if (!cached) return null;
+    
+    const parsed: CachedAnalysis = JSON.parse(cached);
+    const isExpired = Date.now() - parsed.timestamp > CACHE_EXPIRY_MS;
+    
+    if (isExpired) {
+      localStorage.removeItem(getCacheKey(ticker));
+      return null;
+    }
+    
+    return parsed.data;
+  } catch (e) {
+    console.error("Cache read error:", e);
+    return null;
+  }
+};
+
+const cacheAnalysis = (ticker: string, data: AnalysisResult) => {
+  try {
+    const cached: CachedAnalysis = {
+      data,
+      timestamp: Date.now()
+    };
+    
+    // Check cache size before writing
+    let currentSize = calculateCacheSize();
+    const itemSize = JSON.stringify(cached).length * 2;
+    
+    // Prune oldest entries if cache exceeds limit
+    while (currentSize + itemSize > MAX_CACHE_SIZE && Object.keys(localStorage).some(k => k.startsWith(CACHE_KEY_PREFIX))) {
+      pruneOldestCache();
+      currentSize = calculateCacheSize();
+    }
+    
+    localStorage.setItem(getCacheKey(ticker), JSON.stringify(cached));
+  } catch (e) {
+    console.error("Cache write error:", e);
+  }
+};
+
+const clearCache = (ticker?: string) => {
+  try {
+    if (ticker) {
+      localStorage.removeItem(getCacheKey(ticker));
+    } else {
+      // Clear all cache
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(CACHE_KEY_PREFIX)) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Cache clear error:", e);
+  }
+};
+
+// ============================================
+// ERROR HANDLING UTILITIES
+// ============================================
+interface ErrorDetail {
+  message: string;
+  suggestion: string;
+  icon: string;
+  retryable: boolean;
+}
+
+const parseGeminiError = (error: any): ErrorDetail => {
+  const errorStr = JSON.stringify(error);
+  
+  // Quota/Rate Limit Errors
+  if (error?.status === 429 || errorStr.includes("RESOURCE_EXHAUSTED")) {
+    return {
+      message: "API Quota Habis\n\nAnda sudah mencapai limit gratis Gemini API (20 request/hari).",
+      suggestion: "Solusi:\n- Tunggu reset di jam 00:00 UTC (atau timezone lokal Anda)\n- Atau upgrade ke Paid Plan: https://ai.google.dev/gemini-api/docs/rate-limits\n- Data cache tersimpan & bisa diakses ulang tanpa quota.",
+      icon: "LIMIT",
+      retryable: false
+    };
+  }
+  
+  if (errorStr.includes("429") || errorStr.includes("TOO_MANY_REQUESTS")) {
+    return {
+      message: "Request Terlalu Banyak\n\nAPI rate limit tercapai. Silakan tunggu beberapa saat.",
+      suggestion: "Coba lagi dalam 30-60 detik. Sistem akan retry otomatis.",
+      icon: "RATE_LIMIT",
+      retryable: true
+    };
+  }
+  
+  // Network/Connection Errors
+  if (error?.message?.includes("NetworkError") || error?.message?.includes("fetch")) {
+    return {
+      message: "Koneksi Internet Gagal\n\nGagal terhubung ke server AI.",
+      suggestion: "Cek koneksi internet Anda, pastikan stabil. Coba lagi dalam beberapa detik.",
+      icon: "NETWORK",
+      retryable: true
+    };
+  }
+  
+  // Timeout Errors
+  if (error?.message?.includes("timeout") || error?.message?.includes("Timeout")) {
+    return {
+      message: "Request Timeout\n\nServer AI tidak merespons dalam waktu yang ditentukan.",
+      suggestion: "Coba lagi. Jika masalah berlanjut, mungkin server AI sedang down.",
+      icon: "TIMEOUT",
+      retryable: true
+    };
+  }
+  
+  // Data Not Found
+  if (error?.message?.includes("tidak ditemukan") || error?.message?.includes("data tidak tersedia")) {
+    return {
+      message: error.message,
+      suggestion: "Cek di https://www.idx.co.id atau Stockbit untuk ticker yang benar.",
+      icon: "NOT_FOUND",
+      retryable: false
+    };
+  }
+  
+  // JSON Parse Error
+  if (error?.message?.includes("JSON")) {
+    return {
+      message: "Format Response Error\n\nSistem AI mengembalikan format yang tidak valid.",
+      suggestion: "Ini jarang terjadi. Coba lagi atau gunakan ticker lain.",
+      icon: "PARSE_ERROR",
+      retryable: true
+    };
+  }
+  
+  // Default Error
+  return {
+    message: `Terjadi Kesalahan\n\n${error?.message || "Error tidak diketahui"}`,
+    suggestion: "Silakan coba lagi. Jika masalah berlanjut, hubungi support.",
+    icon: "ERROR",
+    retryable: true
+  };
+};
 
 const TOP_STOCKS = [
   { ticker: 'BBCA', name: 'PT Bank Central Asia Tbk' },
@@ -46,12 +242,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
+  const [isCached, setIsCached] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const [sentimentState, setSentimentState] = useState<'idle' | 'loading' | 'warming_up' | 'success' | 'error'>('idle');
   const [sentimentData, setSentimentData] = useState<SentimentResult | null>(null);
+  
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   const suggestionRef = useRef<HTMLDivElement>(null);
-
+  const loadingMessageRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedTimeRef = useRef<NodeJS.Timeout | null>(null);
+  const [showDelayedMessages, setShowDelayedMessages] = useState(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
     function handleClickOutside(event: any) {
       if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
@@ -61,6 +267,51 @@ export default function App() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Reset when loading starts
+  useEffect(() => {
+  if (loading) {
+    setElapsedTime(0);
+    setLoadingMessage('');
+    setShowDelayedMessages(false); // Reset this too
+    
+    elapsedTimeRef.current = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+
+    return () => {
+      if (elapsedTimeRef.current) clearInterval(elapsedTimeRef.current);
+    };
+  }
+}, [loading]);
+
+  useEffect(() => {
+  if (loading && elapsedTime === 5 && !showDelayedMessages) {
+    setShowDelayedMessages(true);
+  }
+}, [loading, elapsedTime, showDelayedMessages]);
+
+// Set up message cycling when showDelayedMessages becomes true
+useEffect(() => {
+  if (showDelayedMessages) {
+    const messages = [
+      'Sorry this takes quite a while...',
+      'Just wait a little bit more...',
+      'Almost there...',
+      'This is Awkward...'
+    ];
+    
+    setLoadingMessage(messages[0]);
+    
+    let messageIndex = 0;
+    const interval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % messages.length;
+      setLoadingMessage(messages[messageIndex]);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }
+}, [showDelayedMessages]);
 
   const filteredStocks = TOP_STOCKS.filter(stock => 
     stock.ticker.toLowerCase().includes(ticker.toLowerCase()) || 
@@ -131,78 +382,109 @@ export default function App() {
 
   const analyzeStock = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!ticker.trim()) return;
+    const trimmedTicker = ticker.trim().toUpperCase();
+    
+    // Validasi input
+    if (!trimmedTicker) {
+      setError('Masukkan kode saham terlebih dahulu (misal: BBCA, TLKM, GOTO)');
+      return;
+    }
+    
+    if (trimmedTicker.length > 5) {
+      setError('Kode saham terlalu panjang. Format ticker Indonesia maksimal 4 karakter (misal: BBCA, TLKM).');
+      return;
+    }
+    
+    if (!/^[A-Z0-9.]+$/.test(trimmedTicker)) {
+      setError('Kode saham hanya boleh menggunakan huruf A-Z, angka, atau titik. Contoh: BBCA atau BBCA.JK');
+      return;
+    }
+    
     setShowSuggestions(false);
-
     setLoading(true);
     setError(null);
+    setErrorDetail(null);
     setResult(null);
     setSentimentState('idle');
     setSentimentData(null);
 
     try {
-      const rawTicker = ticker.trim().toUpperCase();
+      const rawTicker = trimmedTicker;
       const searchTicker = rawTicker.includes(".") ? rawTicker : `${rawTicker}.JK`;
 
-      const prompt = `Anda adalah analis saham dan data engineer.
-Tugas: Cari data saham fundamental terkini untuk emiten dengan kode saham ${searchTicker} di Bursa Efek Indonesia (IDX) menggunakan Google Search real-time.
-Cari informasi berikut:
-1. Harga Saham Terakhir (Current Price)
-2. Book Value per Share (BVPS)
-3. P/BV (Price to Book Value) Ratio. Jika tidak menemukan rasionya, hitung dari Harga / BVPS.
-4. Sektor/Industri
-5. Nama Perusahaan lengkap (Misal Bank Central Asia Tbk untuk BBCA)
-
-Kemudian, berikan analisis teknikal/fundamental pragmatis dengan struktur spesifik.
-
-Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini persis:
-{
-  "companyName": "Nama Perusahaan Tbk",
-  "price": 10000,
-  "bvps": 2000,
-  "pbv": 5.0,
-  "sector": "Perbankan",
-  "analysis": "**Interpretasi**:\\n- ...\\n\\n**Perbandingan Sektor**:\\n- ...\\n\\n**Faktor Positif**:\\n- ...\\n\\n**Pertimbangan Risiko**:\\n- ...\\n\\n**Kesimpulan Pragmatis**:\\n- ..."
-}`;
-
-      const response = await ai.models.generateContent({
-        model: MODEL,
-        contents: prompt,
-        tools: [{ googleSearch: {} }]
-      });
-      
-      const responseText = response.text || "";
-      let data;
-      try {
-        const cleanedText = responseText.replace(/```json/g, "").replace(/```/g, "").trim();
-        data = JSON.parse(cleanedText);
-      } catch (parseErr) {
-        console.error("JSON Parse Error:", parseErr, responseText);
-        throw new Error("Gagal memformat respon atau data tidak ditemukan dari sistem AI. Silakan coba lagi.");
+      // 1. CACHE CHECK (Returns early if found)
+      const cachedData = getCachedAnalysis(rawTicker);
+      if (cachedData) {
+        setResult(cachedData);
+        fetchSentiment(cachedData.analysis || cachedData.companyName);
+        setLoading(false);
+        return;
       }
 
-      setResult({
-        ticker: rawTicker,
-        companyName: data.companyName || rawTicker,
-        price: data.price || 0,
-        bvps: data.bvps || 0,
-        pbv: data.pbv || 0,
-        sector: data.sector || "Umum",
-        analysis: data.analysis || "Analisis tidak tersedia."
+      // 2. FETCH HARD DATA FROM BACKEND PROXY
+      const stockData = await fetchStockData(searchTicker);
+      
+      if (!stockData || !stockData.price) {
+        setLoading(false);
+        setError(`Saham dengan ticker "${rawTicker}" tidak ditemukan di IDX atau data tidak tersedia.\n\nSaran:\n- Pastikan ticker benar (cek di www.idx.co.id)\n- Ticker harus format seperti: BBCA, TLKM, GOTO`);
+        return;
+      }
+
+      // Hitung P/BV secara dinamis (Backend sudah menjamin datanya dalam IDR)
+      let calculatedPbv = 0;
+      if (stockData.bookValuePerShare && stockData.bookValuePerShare > 0) {
+        calculatedPbv = stockData.price / stockData.bookValuePerShare;
+      }
+
+      // 3. CALL BACKEND ANALYSIS API
+      const analyzeResponse = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: rawTicker,
+          sector: stockData.sector,
+          price: stockData.price,
+          bvps: stockData.bookValuePerShare,
+          pbv: calculatedPbv
+        })
       });
 
+      if (!analyzeResponse.ok) {
+        const errorData = await analyzeResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `Analysis API failed with status ${analyzeResponse.status}`);
+      }
+
+      const aiData = await analyzeResponse.json();
+
+      const finalResult = {
+        ticker: rawTicker,
+        companyName: stockData.name || rawTicker,
+        price: stockData.price || 0,
+        bvps: stockData.bookValuePerShare || 0,
+        pbv: calculatedPbv || 0,
+        sector: stockData.sector || "Umum",
+        analysis: aiData.analysis || "Analisis tidak tersedia."
+      };
+
+      // === SAVE TO CACHE UPON SUCCESS ===
+      cacheAnalysis(rawTicker, finalResult);
+      setResult(finalResult);
+
       // Call HuggingFace RoBERTa API
-      fetchSentiment(data.analysis || data.companyName);
+      fetchSentiment(finalResult.analysis || finalResult.companyName);
 
     } catch (err: any) {
       console.error("Analysis Exception:", err);
-      setError(err.message || 'Terjadi kesalahan saat memproses data ke engine AI.');
+      const errorDetail = parseGeminiError(err);
+      setErrorDetail(errorDetail);
+      setError(errorDetail.message);
     } finally {
       setLoading(false);
     }
   };
 
   const getPbvStatus = (pbv: number) => {
+    if (pbv === 0) return { label: 'N/A (Anomali)', color: 'text-text-dim', icon: Info };
     if (pbv < 1.0) return { label: 'Undervalued', color: 'text-emerald-500', icon: CheckCircle };
     if (pbv <= 3.0) return { label: 'Fair Value', color: 'text-accent', icon: Info };
     return { label: 'Overvalued', color: 'text-rose-500', icon: AlertTriangle };
@@ -278,7 +560,7 @@ Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini per
               {loading ? (
                 <span className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  Please wait, currently analyzing...
+                  {elapsedTime >= 5 ? loadingMessage : 'Please wait, currently analyzing...'}
                 </span>
               ) : (
                 'Analyze'
@@ -287,9 +569,14 @@ Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini per
           </form>
 
           {error && (
-            <div className="mt-6 w-full text-left bg-surface-light border border-rose-900/50 text-rose-400 p-4 rounded text-[14px] flex items-start gap-3">
+            <div className="mt-6 w-full text-left bg-surface-light border border-rose-900/50 text-rose-400 p-5 rounded text-[13px] flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <p>{error}</p>
+              <div className="flex-1">
+                <p className="whitespace-pre-wrap leading-relaxed font-semibold">{error}</p>
+                {errorDetail && errorDetail.suggestion && (
+                  <p className="whitespace-pre-wrap leading-relaxed mt-3 opacity-90">{errorDetail.suggestion}</p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -354,7 +641,10 @@ Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini per
                 </div>
                 <div>
                   <div className="text-[24px] md:text-[28px] font-serif text-white leading-tight mb-2">
-                    Rp {Math.round(result.bvps).toLocaleString('id-ID')}
+                    {/* Render angka desimal jika di bawah 1, sebaliknya bulatkan normal */}
+                    Rp {result.bvps > 0 && result.bvps < 1 
+                        ? result.bvps.toFixed(3) 
+                        : Math.round(result.bvps).toLocaleString('id-ID')}
                   </div>
                   <div className="text-[10px] uppercase tracking-[2px] text-text-dim">BVPS</div>
                 </div>
@@ -381,42 +671,78 @@ Keluarkan HANYA JSON Valid tanpa markdown alias blockquote, ikuti format ini per
                 </div>
                 
                 {/* Sentiment Pill Group */}
-                <div className="flex items-center gap-2">
-                   {sentimentState === 'loading' && (
-                     <span className="flex items-center gap-2 text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
-                       <Loader2 className="w-3 h-3 animate-spin" /> NLP Sentiment...
-                     </span>
-                   )}
-                   {sentimentState === 'warming_up' && (
-                     <span className="flex items-center gap-2 text-[11px] text-amber-500 px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
-                       <Loader2 className="w-3 h-3 animate-spin" /> Warming up HuggingFace Model...
-                     </span>
-                   )}
-                   {sentimentState === 'error' && (
-                     <span className="text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full" title="Rate limit or endpoint error from HuggingFace Free Tier">
-                       Sentiment HF: Failed
-                     </span>
-                   )}
-                   {sentimentState === 'missing_token' as any && (
-                     <span className="text-[11px] text-amber-500 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full" title="Requires HF_TOKEN token">
-                       HF_TOKEN required for Sentiment AI
-                     </span>
-                   )}
-                   {sentimentState === 'success' && sentimentData && (
-                     <span className={cn(
-                       "text-[11px] uppercase tracking-[0.5px] px-3 py-1 rounded-full border shadow-sm font-bold flex items-center gap-1",
-                       sentimentData.label === 'LABEL_0' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
-                       sentimentData.label === 'LABEL_2' ? "bg-rose-500/10 text-rose-400 border-rose-500/30" :
-                       "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                     )}>
-                       <BrainCircuit className="w-3 h-3" />
-                       Sentiment: {sentimentData.label === 'LABEL_0' ? 'Positive' : sentimentData.label === 'LABEL_2' ? 'Negative' : 'Neutral'} ({Math.round(sentimentData.score * 100)}%)
-                     </span>
-                   )}
+                <div className="flex flex-col gap-3 w-full lg:w-auto">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {sentimentState === 'loading' && (
+                      <span className="flex items-center gap-2 text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
+                        <Loader2 className="w-3 h-3 animate-spin" /> NLP Sentiment...
+                      </span>
+                    )}
+                    {sentimentState === 'warming_up' && (
+                      <span className="flex items-center gap-2 text-[11px] text-amber-500 px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Warming up HuggingFace Model...
+                      </span>
+                    )}
+                    {sentimentState === 'error' && (
+                      <span className="text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full" title="Rate limit or endpoint error from HuggingFace Free Tier">
+                        Sentiment HF: Failed
+                      </span>
+                    )}
+                    {sentimentState === 'missing_token' as any && (
+                      <span className="text-[11px] text-amber-500 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full" title="Requires HF_TOKEN token">
+                        HF_TOKEN required for Sentiment AI
+                      </span>
+                    )}
+                    {sentimentState === 'success' && sentimentData && (
+                      <span className={cn(
+                        "text-[11px] uppercase tracking-[0.5px] px-3 py-1 rounded-full border shadow-sm font-bold flex items-center gap-1",
+                        sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
+                        sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 text-rose-400 border-rose-500/30" :
+                        "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                      )}>
+                        <BrainCircuit className="w-3 h-3" />
+                        Sentiment: {
+                          sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? 'Positive' : 
+                          sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? 'Negative' : 
+                          'Neutral'
+                        } ({Math.round(sentimentData.score * 100)}%)
+                      </span>
+                    )}
 
-                   <span className="hidden md:inline-flex items-center px-3 py-1 bg-accent/[0.05] border border-accent/30 rounded-full text-[11px] text-accent tracking-[0.5px]">
-                     Gemini Search AI
-                   </span>
+                    <span className="hidden md:inline-flex items-center px-3 py-1 bg-accent/[0.05] border border-accent/30 rounded-full text-[11px] text-accent tracking-[0.5px]">
+                      Gemini Search AI
+                    </span>
+                  </div>
+
+                  {/* Sentiment Explanation Tooltip */}
+                  {sentimentState === 'success' && sentimentData && (
+                    <div className={cn(
+                      "text-[12px] leading-[1.5] px-3 py-2 rounded border",
+                      sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' 
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" :
+                      sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' 
+                        ? "bg-rose-500/10 text-rose-300 border-rose-500/30" :
+                        "bg-blue-500/10 text-blue-300 border-blue-500/30"
+                    )}>
+                      {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                        <div>
+                          <strong className="block mb-1">Sentiment Positif (Bullish)</strong>
+                          <p>Analisis menunjukkan prospek menguntungkan, potensi pertumbuhan, atau faktor-faktor positif dominan. Namun tetap lakukan riset lebih lanjut sebelum berinvestasi.</p>
+                        </div>
+                      ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                        <div>
+                          <strong className="block mb-1">Sentiment Negatif (Bearish)</strong>
+                          <p>Analisis menunjukkan risiko tinggi, potensi penurunan, atau faktor-faktor negatif dominan. Pertimbangkan dengan hati-hati sebelum membeli.</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <strong className="block mb-1">Sentiment Netral (Hold)</strong>
+                          <p>Analisis menunjukkan prospek seimbang dengan faktor positif dan negatif yang setara. Tunggu sinyal yang lebih jelas atau cari informasi tambahan.</p>
+                        </div>
+                      )}
+                      <p className="text-[11px] mt-2 opacity-80">Persentase disebelah Sentimen adalah Confidence Score, dimana semakin tinggi persentase = model AI semakin yakin dengan penilaiannya.</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
