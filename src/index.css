@@ -9,8 +9,8 @@
   --color-text-main: #e0e0e0;
   --color-text-dim: #888888;
   
-  --font-serif: Georgia, serif;
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
 
 body {
@@ -18,6 +18,8 @@ body {
   color: var(--color-text-main);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  font-weight: 400;
+  letter-spacing: -0.3px;
 }
 
 /* Markdown Rendering Customization */
@@ -29,12 +31,23 @@ body {
   margin-top: 1.5em;
   margin-bottom: 0.75em;
   font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.markdown-body h1 {
+  font-size: 1.75rem;
+}
+
+.markdown-body h2 {
+  font-size: 1.5rem;
 }
 
 .markdown-body p {
   margin-bottom: 1em;
   color: var(--color-text-dim);
-  line-height: 1.7;
+  line-height: 1.8;
+  letter-spacing: -0.2px;
 }
 
 .markdown-body strong, .markdown-body b {
