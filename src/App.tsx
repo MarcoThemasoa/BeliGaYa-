@@ -15,7 +15,7 @@ interface StockData {
 
 const fetchStockData = async (searchTicker: string): Promise<StockData | null> => {
   try {
-    const res = await fetch(`/api/stock/${searchTicker}`);
+    const res = await fetch(`/api/stock?ticker=${searchTicker}`);
     if (!res.ok) {
       console.warn("Backend mengembalikan error:", res.status);
       return null;
