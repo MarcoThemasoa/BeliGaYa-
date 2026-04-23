@@ -512,6 +512,7 @@ useEffect(() => {
       }
 
       const aiData = await analyzeResponse.json();
+      const now = Date.now();
 
       const finalResult = {
         ticker: rawTicker,
@@ -520,7 +521,8 @@ useEffect(() => {
         bvps: stockData.bookValuePerShare || 0,
         pbv: calculatedPbv || 0,
         sector: stockData.sector || "Umum",
-        analysis: aiData.analysis || "Analisis tidak tersedia."
+        analysis: aiData.analysis || "Analisis tidak tersedia.",
+        lastAnalyzedTime: now
       };
 
       // === SAVE TO CACHE UPON SUCCESS ===
