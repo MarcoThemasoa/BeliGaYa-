@@ -32,6 +32,27 @@ const fetchStockData = async (searchTicker: string): Promise<StockData | null> =
 const CACHE_KEY_PREFIX = "bgy_analysis_";
 const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB limit
+const DAILY_RESET_KEY = "bgy_last_reset_date";
+
+// Check if it's a new day and reset cache if needed
+const checkAndResetDailyCache = (): void => {
+  const today = new Date().toDateString();
+  const lastResetDate = localStorage.getItem(DAILY_RESET_KEY);
+  
+  if (lastResetDate !== today) {
+    // It's a new day, clear all cache
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith(CACHE_KEY_PREFIX)) {
+        localStorage.removeItem(key);
+      }
+    });
+    localStorage.setItem(DAILY_RESET_KEY, today);
+    console.log("Daily cache reset executed");
+  }
+};
+
+// Execute on app startup
+checkAndResetDailyCache();
 
 const calculateCacheSize = (): number => {
   let size = 0;
@@ -58,6 +79,7 @@ const pruneOldestCache = (): void => {
 interface CachedAnalysis {
   data: AnalysisResult;
   timestamp: number;
+  lastAnalyzedTime?: number;
 }
 
 const getCacheKey = (ticker: string) => `${CACHE_KEY_PREFIX}${ticker.toUpperCase()}`;
@@ -75,7 +97,11 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
       return null;
     }
     
-    return parsed.data;
+    // Add lastAnalyzedTime to the returned data if not present
+    return {
+      ...parsed.data,
+      lastAnalyzedTime: parsed.lastAnalyzedTime || parsed.timestamp
+    };
   } catch (e) {
     console.error("Cache read error:", e);
     return null;
@@ -84,9 +110,14 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
 
 const cacheAnalysis = (ticker: string, data: AnalysisResult) => {
   try {
+    const now = Date.now();
     const cached: CachedAnalysis = {
-      data,
-      timestamp: Date.now()
+      data: {
+        ...data,
+        lastAnalyzedTime: now
+      },
+      timestamp: now,
+      lastAnalyzedTime: now
     };
     
     // Check cache size before writing
@@ -221,6 +252,30 @@ const TOP_STOCKS = [
   { ticker: 'ANTM', name: 'PT Aneka Tambang Tbk' }
 ];
 
+// Format timestamp untuk display
+const formatLastAnalyzedTime = (timestamp?: number): string => {
+  if (!timestamp) return 'N/A';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  
+  return date.toLocaleDateString('id-ID', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 interface AnalysisResult {
   ticker: string;
   companyName: string;
@@ -229,6 +284,7 @@ interface AnalysisResult {
   pbv: number;
   sector: string;
   analysis: string;
+  lastAnalyzedTime?: number;
 }
 
 interface SentimentResult {
@@ -416,6 +472,7 @@ useEffect(() => {
       const cachedData = getCachedAnalysis(rawTicker);
       if (cachedData) {
         setResult(cachedData);
+        setIsCached(true);
         fetchSentiment(cachedData.analysis || cachedData.companyName);
         setLoading(false);
         return;
@@ -469,6 +526,7 @@ useEffect(() => {
       // === SAVE TO CACHE UPON SUCCESS ===
       cacheAnalysis(rawTicker, finalResult);
       setResult(finalResult);
+      setIsCached(false);
 
       // Call HuggingFace RoBERTa API
       fetchSentiment(finalResult.analysis || finalResult.companyName);
@@ -494,9 +552,20 @@ useEffect(() => {
     <div className="min-h-screen bg-background text-text-main font-sans selection:bg-accent/30 selection:text-accent flex flex-col">
       {/* Header */}
       <header className="h-[72px] border-b border-border-subtle bg-surface px-6 md:px-10 flex items-center justify-between sticky top-0 z-10 shrink-0">
-        <div className="font-serif text-xl md:text-2xl italic tracking-[-0.5px] text-accent font-bold">
+        <button 
+          onClick={() => {
+            setResult(null);
+            setTicker('');
+            setError(null);
+            setErrorDetail(null);
+            setSentimentState('idle');
+            setSentimentData(null);
+          }}
+          className="font-serif text-xl md:text-2xl italic tracking-[-0.5px] text-accent font-bold hover:opacity-80 transition-opacity cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background rounded px-2 py-1"
+          title="Back to home"
+        >
           BGY <span className="text-white text-lg font-normal ml-1">(Beli Ga Ya?)</span>
-        </div>
+        </button>
         <div className="flex items-center gap-6">
           <span className="hidden md:inline-flex items-center px-3 py-1 bg-surface-light border border-border-subtle rounded-full text-[11px] text-accent tracking-[0.5px]">
             AI Engine: Active
@@ -587,7 +656,25 @@ useEffect(() => {
             
             {/* Header Information Card */}
             <div className="bg-surface border border-border-subtle rounded p-6 md:p-8 relative">
-              <div className="text-[10px] uppercase tracking-[2px] text-text-dim mb-4">Target Entity</div>
+              <div className="flex justify-between items-start mb-4">
+                <div className="text-[10px] uppercase tracking-[2px] text-text-dim">Target Entity</div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="text-[10px] uppercase tracking-[2px] text-text-dim">
+                    Last Analyzed: <span className="text-accent font-semibold">{formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
+                    {isCached && <span className="ml-2 inline-block px-2 py-0.5 bg-accent/10 text-accent/70 rounded text-[9px]">CACHED</span>}
+                  </div>
+                  <button
+                    onClick={() => {
+                      clearCache(result.ticker);
+                      analyzeStock();
+                    }}
+                    disabled={loading}
+                    className="text-[11px] px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 rounded transition-colors disabled:opacity-50 cursor-pointer font-medium"
+                  >
+                    {loading ? 'Analyzing...' : 'Re-analyze'}
+                  </button>
+                </div>
+              </div>
               <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6">
                 <div>
                   <h2 className="font-serif text-[28px] md:text-[32px] text-white mb-3">{result.companyName}</h2>
