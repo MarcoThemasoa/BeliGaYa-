@@ -98,8 +98,10 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
     }
     
     // Add lastAnalyzedTime to the returned data if not present
+    // Also clean the analysis text
     return {
       ...parsed.data,
+      analysis: cleanAnalysisText(parsed.data.analysis),
       lastAnalyzedTime: parsed.lastAnalyzedTime || parsed.timestamp
     };
   } catch (e) {
@@ -274,6 +276,11 @@ const formatLastAnalyzedTime = (timestamp?: number): string => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+// Clean up analysis text - convert literal \n to actual newlines
+const cleanAnalysisText = (text: string): string => {
+  return text.replace(/\\n/g, '\n');
 };
 
 interface AnalysisResult {
@@ -521,7 +528,7 @@ useEffect(() => {
         bvps: stockData.bookValuePerShare || 0,
         pbv: calculatedPbv || 0,
         sector: stockData.sector || "Umum",
-        analysis: aiData.analysis || "Analisis tidak tersedia.",
+        analysis: cleanAnalysisText(aiData.analysis || "Analisis tidak tersedia."),
         lastAnalyzedTime: now
       };
 
