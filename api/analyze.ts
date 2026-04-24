@@ -28,15 +28,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
-      console.error('GEMINI_API_KEY is not set');
       return res.status(500).json({ error: 'AI service not configured' });
     }
 
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
+    // 1. UPDATE PROMPT
     const prompt = `Lakukan analisis teknikal dan fundamental pragmatis untuk emiten ${ticker} (Sektor: ${sector}). 
-    Harga saat ini: Rp${price}, BVPS: Rp${bvps.toFixed(2)}, PBV: ${pbv.toFixed(2)}x.
-    Berikan respons dalam format JSON dengan kunci: 'interpretasi', 'perbandingan_sektor', 'faktor_positif' (gunakan bullet points markdown), 'risiko' (gunakan bullet points markdown), dan 'kesimpulan'.`;
+      Harga saat ini: Rp${price}, BVPS: Rp${bvps.toFixed(2)}, PBV: ${pbv.toFixed(2)}x.
+      Berikan respons dengan gaya profesional. Gunakan bullet points markdown untuk bagian faktor positif dan risiko.`;
+
+    // 2. UPDATE RESPONSE SCHEMA
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: prompt,
@@ -45,12 +47,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         responseSchema: {
           type: 'OBJECT',
           properties: {
-            analysis: {
-              type: 'STRING',
-              description: 'Markdown formatted analysis string containing Interpretasi, Perbandingan Sektor, Faktor Positif, Risiko, and Kesimpulan.'
-            }
+            interpretasi: { type: 'STRING', description: 'Analisis mengenai metrik harga, BVPS, dan PBV dalam format markdown.' },
+            perbandingan_sektor: { type: 'STRING', description: 'Perbandingan emiten dengan kompetitor di sektornya dalam format markdown.' },
+            faktor_positif: { type: 'STRING', description: 'Poin-poin faktor positif, format HANYA sebagai bullet points markdown.' },
+            risiko: { type: 'STRING', description: 'Poin-poin risiko, format HANYA sebagai bullet points markdown.' },
+            kesimpulan: { type: 'STRING', description: 'Kesimpulan pragmatis dalam format markdown.' }
           },
-          required: ['analysis']
+          required: ['interpretasi', 'perbandingan_sektor', 'faktor_positif', 'risiko', 'kesimpulan']
         }
       }
     } as any);
@@ -58,35 +61,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const responseText = response.text || '{}';
     const aiData = JSON.parse(responseText);
 
-    // Add cache headers for 1 hour
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
+    // 3. LANGSUNG RETURN SELURUH OBJECT AIDATA
     return res.json({
-      analysis: aiData.analysis || 'Analisis tidak tersedia.'
+      interpretasi: aiData.interpretasi,
+      perbandingan_sektor: aiData.perbandingan_sektor,
+      faktor_positif: aiData.faktor_positif,
+      risiko: aiData.risiko,
+      kesimpulan: aiData.kesimpulan
     });
+    
   } catch (error: any) {
     console.error('Gemini API Error:', error);
 
-    // Handle specific Gemini errors
+    // Error handling lama kamu biarkan sama...
     if (error?.status === 429) {
-      return res.status(429).json({
-        error: 'API Quota Habis',
-        message: 'Anda sudah mencapai limit gratis Gemini API (20 request/hari).',
-        retryable: false
-      });
+      return res.status(429).json({ error: 'API Quota Habis', message: 'Anda sudah mencapai limit gratis Gemini API (20 request/hari).', retryable: false });
     }
-
     if (error?.message?.includes('RESOURCE_EXHAUSTED')) {
-      return res.status(429).json({
-        error: 'Resource Exhausted',
-        message: 'API quota limit tercapai. Silakan coba lagi nanti.',
-        retryable: false
-      });
+      return res.status(429).json({ error: 'Resource Exhausted', message: 'API quota limit tercapai. Silakan coba lagi nanti.', retryable: false });
     }
-
-    return res.status(500).json({
-      error: 'AI analysis failed',
-      details: error?.message || 'Unknown error'
-    });
+    return res.status(500).json({ error: 'AI analysis failed', details: error?.message || 'Unknown error' });
   }
 }
