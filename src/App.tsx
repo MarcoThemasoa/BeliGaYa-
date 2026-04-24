@@ -101,7 +101,11 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
     // Also clean the analysis text
     return {
       ...parsed.data,
-      analysis: cleanAnalysisText(parsed.data.analysis),
+      interpretasi: cleanAnalysisText(parsed.data.interpretasi || ""),
+      perbandingan_sektor: cleanAnalysisText(parsed.data.perbandingan_sektor || ""),
+      faktor_positif: cleanAnalysisText(parsed.data.faktor_positif || ""),
+      risiko: cleanAnalysisText(parsed.data.risiko || ""),
+      kesimpulan: cleanAnalysisText(parsed.data.kesimpulan || ""),
       lastAnalyzedTime: parsed.lastAnalyzedTime || parsed.timestamp
     };
   } catch (e) {
@@ -290,7 +294,11 @@ interface AnalysisResult {
   bvps: number;
   pbv: number;
   sector: string;
-  analysis: string;
+  interpretasi: string;
+  perbandingan_sektor: string;
+  faktor_positif: string;
+  risiko: string;
+  kesimpulan: string;
   lastAnalyzedTime?: number;
 }
 
@@ -480,7 +488,7 @@ useEffect(() => {
       if (cachedData) {
         setResult(cachedData);
         setIsCached(true);
-        fetchSentiment(cachedData.analysis || cachedData.companyName);
+        fetchSentiment(cachedData.kesimpulan || cachedData.companyName); 
         setLoading(false);
         return;
       }
@@ -528,7 +536,11 @@ useEffect(() => {
         bvps: stockData.bookValuePerShare || 0,
         pbv: calculatedPbv || 0,
         sector: stockData.sector || "Umum",
-        analysis: cleanAnalysisText(aiData.analysis || "Analisis tidak tersedia."),
+        interpretasi: cleanAnalysisText(aiData.interpretasi || "Data tidak tersedia."),
+        perbandingan_sektor: cleanAnalysisText(aiData.perbandingan_sektor || "Data tidak tersedia."),
+        faktor_positif: cleanAnalysisText(aiData.faktor_positif || "Data tidak tersedia."),
+        risiko: cleanAnalysisText(aiData.risiko || "Data tidak tersedia."),
+        kesimpulan: cleanAnalysisText(aiData.kesimpulan || "Data tidak tersedia."),
         lastAnalyzedTime: now
       };
 
@@ -537,8 +549,8 @@ useEffect(() => {
       setResult(finalResult);
       setIsCached(false);
 
-      // Call HuggingFace RoBERTa API
-      fetchSentiment(finalResult.analysis || finalResult.companyName);
+      // Call HuggingFace RoBERTa API (Gunakan kesimpulan saja untuk menghemat token HF)
+      fetchSentiment(finalResult.kesimpulan || finalResult.companyName);
 
     } catch (err: any) {
       console.error("Analysis Exception:", err);
@@ -842,8 +854,43 @@ useEffect(() => {
                 </div>
               </div>
               
-              <div className="markdown-body">
-                <Markdown>{result.analysis}</Markdown>
+              <div className="flex flex-col gap-8 text-text-main leading-relaxed">
+                <section>
+                  <h3 className="font-serif text-xl text-white mb-3 border-b border-border-subtle pb-2">Interpretasi Metrik</h3>
+                  <div className="markdown-body text-[15px]">
+                    <Markdown>{result.interpretasi}</Markdown>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="font-serif text-xl text-white mb-3 border-b border-border-subtle pb-2">Perbandingan Sektor</h3>
+                  <div className="markdown-body text-[15px]">
+                    <Markdown>{result.perbandingan_sektor}</Markdown>
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <section className="bg-emerald-950/10 border border-emerald-900/30 p-5 rounded">
+                    <h3 className="font-serif text-lg text-emerald-400 mb-3">Faktor Positif</h3>
+                    <div className="markdown-body text-[14px]">
+                      <Markdown>{result.faktor_positif}</Markdown>
+                    </div>
+                  </section>
+
+                  <section className="bg-rose-950/10 border border-rose-900/30 p-5 rounded">
+                    <h3 className="font-serif text-lg text-rose-400 mb-3">Risiko</h3>
+                    <div className="markdown-body text-[14px]">
+                      <Markdown>{result.risiko}</Markdown>
+                    </div>
+                  </section>
+                </div>
+
+                <section className="bg-surface-light border border-border-subtle p-5 rounded">
+                  <h3 className="font-serif text-xl text-accent mb-3">Kesimpulan</h3>
+                  <div className="markdown-body text-[15px]">
+                    <Markdown>{result.kesimpulan}</Markdown>
+                  </div>
+                </section>
               </div>
             </div>
 

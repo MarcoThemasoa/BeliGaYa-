@@ -34,10 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    const prompt = `Analisis teknikal dan fundamental pragmatis untuk emiten ${ticker} (Sektor: ${sector}). 
-      Harga saat ini: Rp${price}, BVPS: Rp${bvps.toFixed(2)}, PBV: ${pbv.toFixed(2)}x.
-      Berikan analisis terstruktur mengenai: interpretasi metrik, perbandingan sektor, faktor positif, risiko, dan kesimpulan pragmatis. Format menggunakan Markdown.`;
-
+    const prompt = `Lakukan analisis teknikal dan fundamental pragmatis untuk emiten ${ticker} (Sektor: ${sector}). 
+    Harga saat ini: Rp${price}, BVPS: Rp${bvps.toFixed(2)}, PBV: ${pbv.toFixed(2)}x.
+    Berikan respons dalam format JSON dengan kunci: 'interpretasi', 'perbandingan_sektor', 'faktor_positif' (gunakan bullet points markdown), 'risiko' (gunakan bullet points markdown), dan 'kesimpulan'.`;
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: prompt,
