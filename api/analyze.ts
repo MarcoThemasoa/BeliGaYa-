@@ -82,6 +82,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error?.message?.includes('RESOURCE_EXHAUSTED')) {
       return res.status(429).json({ error: 'Resource Exhausted', message: 'API quota limit tercapai. Silakan coba lagi nanti.', retryable: false });
     }
-    return res.status(500).json({ error: 'AI analysis failed', details: error?.message || 'Unknown error' });
+    return res.status(500).json({ error: 'AI analysis failed (Try again later)', details: error?.message || 'Unknown error' });
   }
 }
