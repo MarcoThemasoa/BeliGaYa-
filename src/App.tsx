@@ -101,11 +101,7 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
     // Also clean the analysis text
     return {
       ...parsed.data,
-      interpretasi: cleanAnalysisText(parsed.data.interpretasi || ""),
-      perbandingan_sektor: cleanAnalysisText(parsed.data.perbandingan_sektor || ""),
-      faktor_positif: cleanAnalysisText(parsed.data.faktor_positif || ""),
-      risiko: cleanAnalysisText(parsed.data.risiko || ""),
-      kesimpulan: cleanAnalysisText(parsed.data.kesimpulan || ""),
+      analysis: parsed.data.analysis, // Langsung kembalikan datanya tanpa di-clean
       lastAnalyzedTime: parsed.lastAnalyzedTime || parsed.timestamp
     };
   } catch (e) {
@@ -283,9 +279,14 @@ const formatLastAnalyzedTime = (timestamp?: number): string => {
 };
 
 // Clean up analysis text - convert literal \n to actual newlines
-const cleanAnalysisText = (text: string): string => {
-  return text.replace(/\\n/g, '\n');
-};
+// Tambahkan format struktur JSON dari API
+export interface AnalysisData {
+  interpretasi?: string;
+  perbandingan_sektor?: string;
+  faktor_positif?: string[];
+  risiko?: string[];
+  kesimpulan?: string;
+}
 
 interface AnalysisResult {
   ticker: string;
@@ -294,11 +295,7 @@ interface AnalysisResult {
   bvps: number;
   pbv: number;
   sector: string;
-  interpretasi: string;
-  perbandingan_sektor: string;
-  faktor_positif: string;
-  risiko: string;
-  kesimpulan: string;
+  analysis: AnalysisData; // Sekarang menggunakan Object, bukan string
   lastAnalyzedTime?: number;
 }
 
@@ -488,7 +485,7 @@ useEffect(() => {
       if (cachedData) {
         setResult(cachedData);
         setIsCached(true);
-        fetchSentiment(cachedData.kesimpulan || cachedData.companyName); 
+        fetchSentiment(cachedData.analysis?.kesimpulan || cachedData.companyName); 
         setLoading(false);
         return;
       }
@@ -529,18 +526,14 @@ useEffect(() => {
       const aiData = await analyzeResponse.json();
       const now = Date.now();
 
-      const finalResult = {
+      const finalResult: AnalysisResult = {
         ticker: rawTicker,
         companyName: stockData.name || rawTicker,
         price: stockData.price || 0,
         bvps: stockData.bookValuePerShare || 0,
         pbv: calculatedPbv || 0,
         sector: stockData.sector || "Umum",
-        interpretasi: cleanAnalysisText(aiData.interpretasi || "Data tidak tersedia."),
-        perbandingan_sektor: cleanAnalysisText(aiData.perbandingan_sektor || "Data tidak tersedia."),
-        faktor_positif: cleanAnalysisText(aiData.faktor_positif || "Data tidak tersedia."),
-        risiko: cleanAnalysisText(aiData.risiko || "Data tidak tersedia."),
-        kesimpulan: cleanAnalysisText(aiData.kesimpulan || "Data tidak tersedia."),
+        analysis: aiData, // Langsung masukkan Object JSON dari API
         lastAnalyzedTime: now
       };
 
@@ -550,7 +543,7 @@ useEffect(() => {
       setIsCached(false);
 
       // Call HuggingFace RoBERTa API (Gunakan kesimpulan saja untuk menghemat token HF)
-      fetchSentiment(finalResult.kesimpulan || finalResult.companyName);
+      fetchSentiment(finalResult.analysis?.kesimpulan || finalResult.companyName);
 
     } catch (err: any) {
       console.error("Analysis Exception:", err);
@@ -854,43 +847,44 @@ useEffect(() => {
                 </div>
               </div>
               
-              <div className="flex flex-col gap-8 text-text-main leading-relaxed">
-                <section>
-                  <h3 className="font-serif text-xl text-white mb-3 border-b border-border-subtle pb-2">Interpretasi Metrik</h3>
-                  <div className="markdown-body text-[15px]">
-                    <Markdown>{result.interpretasi}</Markdown>
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="font-serif text-xl text-white mb-3 border-b border-border-subtle pb-2">Perbandingan Sektor</h3>
-                  <div className="markdown-body text-[15px]">
-                    <Markdown>{result.perbandingan_sektor}</Markdown>
-                  </div>
-                </section>
-
+              <div className="flex flex-col gap-6 text-text-main">
+                {/* Interpretasi & Perbandingan */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <section className="bg-emerald-950/10 border border-emerald-900/30 p-5 rounded">
-                    <h3 className="font-serif text-lg text-emerald-400 mb-3">Faktor Positif</h3>
-                    <div className="markdown-body text-[14px]">
-                      <Markdown>{result.faktor_positif}</Markdown>
-                    </div>
-                  </section>
-
-                  <section className="bg-rose-950/10 border border-rose-900/30 p-5 rounded">
-                    <h3 className="font-serif text-lg text-rose-400 mb-3">Risiko</h3>
-                    <div className="markdown-body text-[14px]">
-                      <Markdown>{result.risiko}</Markdown>
-                    </div>
-                  </section>
+                  <div className="bg-surface-light border border-border-subtle p-5 rounded-xl">
+                    <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Interpretasi Metrik</h3>
+                    <p className="leading-relaxed text-[14px] text-text-dim">{result.analysis?.interpretasi}</p>
+                  </div>
+                  <div className="bg-surface-light border border-border-subtle p-5 rounded-xl">
+                    <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Perbandingan Sektor</h3>
+                    <p className="leading-relaxed text-[14px] text-text-dim">{result.analysis?.perbandingan_sektor}</p>
+                  </div>
                 </div>
 
-                <section className="bg-surface-light border border-border-subtle p-5 rounded">
-                  <h3 className="font-serif text-xl text-accent mb-3">Kesimpulan</h3>
-                  <div className="markdown-body text-[15px]">
-                    <Markdown>{result.kesimpulan}</Markdown>
+                {/* Faktor Positif & Risiko */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="border border-emerald-900/50 bg-emerald-950/10 p-5 rounded-xl">
+                    <h3 className="text-emerald-400 font-semibold text-[13px] mb-4 uppercase tracking-wider">Faktor Positif</h3>
+                    <ul className="list-disc pl-5 space-y-2 text-[14px] text-text-dim">
+                      {result.analysis?.faktor_positif?.map((poin: string, index: number) => (
+                        <li key={index} className="leading-relaxed">{poin}</li>
+                      ))}
+                    </ul>
                   </div>
-                </section>
+                  <div className="border border-rose-900/50 bg-rose-950/10 p-5 rounded-xl">
+                    <h3 className="text-rose-400 font-semibold text-[13px] mb-4 uppercase tracking-wider">Risiko</h3>
+                    <ul className="list-disc pl-5 space-y-2 text-[14px] text-text-dim">
+                      {result.analysis?.risiko?.map((poin: string, index: number) => (
+                        <li key={index} className="leading-relaxed">{poin}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Kesimpulan */}
+                <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl mt-2">
+                  <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Kesimpulan Pragmatis</h3>
+                  <p className="leading-relaxed text-[14px] text-white font-medium">{result.analysis?.kesimpulan}</p>
+                </div>
               </div>
             </div>
 

@@ -33,25 +33,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    // 1. UPDATE PROMPT
+    // Prompt diperbarui agar fokus ke isi, bukan format Markdown
     const prompt = `Lakukan analisis teknikal dan fundamental pragmatis untuk emiten ${ticker} (Sektor: ${sector}). 
       Harga saat ini: Rp${price}, BVPS: Rp${bvps.toFixed(2)}, PBV: ${pbv.toFixed(2)}x.
-      Berikan respons dengan gaya profesional. Gunakan bullet points markdown untuk bagian faktor positif dan risiko.`;
+      Berikan hasil analisis yang terstruktur dan padat. Untuk faktor positif dan risiko, berikan dalam bentuk poin-poin yang jelas.`;
 
-    // 2. UPDATE RESPONSE SCHEMA
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
+        // Skema JSON dirombak total menjadi terstruktur
         responseSchema: {
           type: 'OBJECT',
           properties: {
-            interpretasi: { type: 'STRING', description: 'Analisis mengenai metrik harga, BVPS, dan PBV dalam format markdown.' },
-            perbandingan_sektor: { type: 'STRING', description: 'Perbandingan emiten dengan kompetitor di sektornya dalam format markdown.' },
-            faktor_positif: { type: 'STRING', description: 'Poin-poin faktor positif, format HANYA sebagai bullet points markdown.' },
-            risiko: { type: 'STRING', description: 'Poin-poin risiko, format HANYA sebagai bullet points markdown.' },
-            kesimpulan: { type: 'STRING', description: 'Kesimpulan pragmatis dalam format markdown.' }
+            interpretasi: { type: 'STRING' },
+            perbandingan_sektor: { type: 'STRING' },
+            faktor_positif: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Daftar poin-poin faktor positif, keunggulan, atau katalis pendorong saham'
+            },
+            risiko: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Daftar poin-poin risiko investasi, ancaman, atau kelemahan saham'
+            },
+            kesimpulan: { type: 'STRING' }
           },
           required: ['interpretasi', 'perbandingan_sektor', 'faktor_positif', 'risiko', 'kesimpulan']
         }
@@ -61,16 +69,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const responseText = response.text || '{}';
     const aiData = JSON.parse(responseText);
 
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-
-    // 3. LANGSUNG RETURN SELURUH OBJECT AIDATA
-    return res.json({
-      interpretasi: aiData.interpretasi,
-      perbandingan_sektor: aiData.perbandingan_sektor,
-      faktor_positif: aiData.faktor_positif,
-      risiko: aiData.risiko,
-      kesimpulan: aiData.kesimpulan
-    });
+    // Kirim seluruh objek JSON ke frontend
+    return res.json(aiData);
     
   } catch (error: any) {
     console.error('Gemini API Error:', error);
