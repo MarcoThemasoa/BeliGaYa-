@@ -756,12 +756,13 @@ useEffect(() => {
               </div>
 
               {/* Sector Card */}
-              <div className="bg-surface-light border border-border-subtle p-6 rounded flex flex-col justify-between min-h-[140px]">
+              <div className="bg-surface-light border border-border-subtle p-6 rounded flex flex-col min-h-[140px]">
                 <div className="text-[12px] font-semibold text-text-main flex items-center gap-2 mb-4">
                   <Building className="w-4 h-4 text-text-dim" /> Industry Check
                 </div>
-                <div>
-                  <div className="text-[20px] font-serif text-white leading-tight">
+                {/* Bagian ini diubah agar mengisi sisa ruang dan menengahkan konten */}
+                <div className="flex-1 flex items-center justify-center pb-2">
+                  <div className="text-[20px] md:text-[22px] font-serif text-white leading-tight text-center">
                     {result.sector}
                   </div>
                 </div>
