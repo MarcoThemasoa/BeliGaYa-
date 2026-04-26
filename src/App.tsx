@@ -366,7 +366,11 @@ useEffect(() => {
       'Sorry this takes quite a while...',
       'Just wait a little bit more...',
       'Almost there...',
-      'This is Awkward...'
+      'This is Awkward...',
+      'Sorry for the wait, LLMs can be slow..',
+      'Im broke so i cant afford faster models :(',
+      'If this takes more than 30 seconds, try refreshing the page.',
+      '6 7 6 7'
     ];
     
     setLoadingMessage(messages[0]);
