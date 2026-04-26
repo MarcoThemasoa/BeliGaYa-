@@ -369,7 +369,7 @@ useEffect(() => {
       'This is Awkward...',
       'Sorry for the wait, LLMs can be slow..',
       'Im broke so i cant afford faster models :(',
-      'If this takes more than 30 seconds, try refreshing the page.',
+      'If this takes more than a minute, try refreshing the page.',
       '6 7 6 7'
     ];
     
