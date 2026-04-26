@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Info, TrendingUp, AlertTriangle, CheckCircle, Calculator, Building, Banknote, BrainCircuit, Loader2 } from 'lucide-react';
+import { Search, Info, TrendingUp, AlertTriangle, CheckCircle, Calculator, Building, Banknote, BrainCircuit, Loader2, BarChart3, Sparkles, RefreshCw } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { cn } from './lib/utils';
 
@@ -97,11 +97,9 @@ const getCachedAnalysis = (ticker: string): AnalysisResult | null => {
       return null;
     }
     
-    // Add lastAnalyzedTime to the returned data if not present
-    // Also clean the analysis text
     return {
       ...parsed.data,
-      analysis: parsed.data.analysis, // Langsung kembalikan datanya tanpa di-clean
+      analysis: parsed.data.analysis,
       lastAnalyzedTime: parsed.lastAnalyzedTime || parsed.timestamp
     };
   } catch (e) {
@@ -122,11 +120,9 @@ const cacheAnalysis = (ticker: string, data: AnalysisResult) => {
       lastAnalyzedTime: now
     };
     
-    // Check cache size before writing
     let currentSize = calculateCacheSize();
     const itemSize = JSON.stringify(cached).length * 2;
     
-    // Prune oldest entries if cache exceeds limit
     while (currentSize + itemSize > MAX_CACHE_SIZE && Object.keys(localStorage).some(k => k.startsWith(CACHE_KEY_PREFIX))) {
       pruneOldestCache();
       currentSize = calculateCacheSize();
@@ -143,7 +139,6 @@ const clearCache = (ticker?: string) => {
     if (ticker) {
       localStorage.removeItem(getCacheKey(ticker));
     } else {
-      // Clear all cache
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith(CACHE_KEY_PREFIX)) {
           localStorage.removeItem(key);
@@ -168,134 +163,76 @@ interface ErrorDetail {
 const parseGeminiError = (error: any): ErrorDetail => {
   const errorStr = JSON.stringify(error);
   
-  // Quota/Rate Limit Errors
-  if (error?.status === 429 || errorStr.includes("RESOURCE_EXHAUSTED")) {
+  if (error.error === 'API Quota Habis' || error.message?.includes('20 request')) {
     return {
-      message: "API Quota Habis\n\nAnda sudah mencapai limit gratis Gemini API (20 request/hari).",
-      suggestion: "Solusi:\n- Tunggu reset di jam 00:00 UTC (atau timezone lokal Anda)\n- Atau upgrade ke Paid Plan: https://ai.google.dev/gemini-api/docs/rate-limits\n- Data cache tersimpan & bisa diakses ulang tanpa quota.",
-      icon: "LIMIT",
+      message: 'Daily Quota Reached',
+      suggestion: 'Gemini free tier limit: 20 requests/day. Try again tomorrow.',
+      icon: 'AlertTriangle',
       retryable: false
     };
   }
   
-  if (errorStr.includes("429") || errorStr.includes("TOO_MANY_REQUESTS")) {
+  if (error.message?.includes('RESOURCE_EXHAUSTED') || error.error === 'Resource Exhausted') {
     return {
-      message: "Request Terlalu Banyak\n\nAPI rate limit tercapai. Silakan tunggu beberapa saat.",
-      suggestion: "Coba lagi dalam 30-60 detik. Sistem akan retry otomatis.",
-      icon: "RATE_LIMIT",
-      retryable: true
-    };
-  }
-  
-  // Network/Connection Errors
-  if (error?.message?.includes("NetworkError") || error?.message?.includes("fetch")) {
-    return {
-      message: "Koneksi Internet Gagal\n\nGagal terhubung ke server AI.",
-      suggestion: "Cek koneksi internet Anda, pastikan stabil. Coba lagi dalam beberapa detik.",
-      icon: "NETWORK",
-      retryable: true
-    };
-  }
-  
-  // Timeout Errors
-  if (error?.message?.includes("timeout") || error?.message?.includes("Timeout")) {
-    return {
-      message: "Request Timeout\n\nServer AI tidak merespons dalam waktu yang ditentukan.",
-      suggestion: "Coba lagi. Jika masalah berlanjut, mungkin server AI sedang down.",
-      icon: "TIMEOUT",
-      retryable: true
-    };
-  }
-  
-  // Data Not Found
-  if (error?.message?.includes("tidak ditemukan") || error?.message?.includes("data tidak tersedia")) {
-    return {
-      message: error.message,
-      suggestion: "Cek di https://www.idx.co.id atau Stockbit untuk ticker yang benar.",
-      icon: "NOT_FOUND",
+      message: 'API Quota Exhausted',
+      suggestion: 'Daily limit reached. Try again in 24 hours.',
+      icon: 'AlertTriangle',
       retryable: false
     };
   }
   
-  // JSON Parse Error
-  if (error?.message?.includes("JSON")) {
+  if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE')) {
     return {
-      message: "Format Response Error\n\nSistem AI mengembalikan format yang tidak valid.",
-      suggestion: "Ini jarang terjadi. Coba lagi atau gunakan ticker lain.",
-      icon: "PARSE_ERROR",
+      message: 'Service Temporarily Unavailable',
+      suggestion: 'Gemini API is experiencing issues. Retry in a few minutes.',
+      icon: 'Info',
       retryable: true
     };
   }
   
-  // Default Error
+  if (errorStr.includes('429') || errorStr.includes('RATE_LIMIT')) {
+    return {
+      message: 'Rate Limited',
+      suggestion: 'Too many requests. Wait 1 minute before retrying.',
+      icon: 'AlertTriangle',
+      retryable: true
+    };
+  }
+  
+  if (errorStr.includes('401') || errorStr.includes('UNAUTHENTICATED')) {
+    return {
+      message: 'Authentication Error',
+      suggestion: 'API key missing or invalid. Check backend configuration.',
+      icon: 'AlertTriangle',
+      retryable: false
+    };
+  }
+  
   return {
-    message: `Terjadi Kesalahan\n\n${error?.message || "Error tidak diketahui"}`,
-    suggestion: "Silakan coba lagi. Jika masalah berlanjut, hubungi support.",
-    icon: "ERROR",
+    message: 'Unknown Error',
+    suggestion: 'Something went wrong. Try again later.',
+    icon: 'Info',
     retryable: true
   };
 };
 
-const TOP_STOCKS = [
-  { ticker: 'BBCA', name: 'PT Bank Central Asia Tbk' },
-  { ticker: 'BBRI', name: 'PT Bank Rakyat Indonesia (Persero) Tbk' },
-  { ticker: 'BMRI', name: 'PT Bank Mandiri (Persero) Tbk' },
-  { ticker: 'BBNI', name: 'PT Bank Negara Indonesia (Persero) Tbk' },
-  { ticker: 'TLKM', name: 'PT Telkom Indonesia (Persero) Tbk' },
-  { ticker: 'ASII', name: 'PT Astra International Tbk' },
-  { ticker: 'GOTO', name: 'PT GoTo Gojek Tokopedia Tbk' },
-  { ticker: 'ICBP', name: 'PT Indofood CBP Sukses Makmur Tbk' },
-  { ticker: 'UNVR', name: 'PT Unilever Indonesia Tbk' },
-  { ticker: 'AMMN', name: 'PT Amman Mineral Internasional Tbk' },
-  { ticker: 'BRPT', name: 'PT Barito Pacific Tbk' },
-  { ticker: 'SIDO', name: 'PT Industri Jamu dan Farmasi Sido Muncul Tbk' },
-  { ticker: 'ADRO', name: 'PT Adaro Energy Indonesia Tbk' },
-  { ticker: 'PGAS', name: 'PT Perusahaan Gas Negara Tbk' },
-  { ticker: 'ANTM', name: 'PT Aneka Tambang Tbk' }
-];
-
-// Format timestamp untuk display
-const formatLastAnalyzedTime = (timestamp?: number): string => {
-  if (!timestamp) return 'N/A';
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  
-  return date.toLocaleDateString('id-ID', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-// Clean up analysis text - convert literal \n to actual newlines
-// Tambahkan format struktur JSON dari API
-export interface AnalysisData {
-  interpretasi?: string;
-  perbandingan_sektor?: string;
-  faktor_positif?: string[];
-  risiko?: string[];
-  kesimpulan?: string;
-}
-
+// ============================================
+// ANALYSIS TYPES
+// ============================================
 interface AnalysisResult {
   ticker: string;
-  companyName: string;
+  name: string;
   price: number;
   bvps: number;
   pbv: number;
   sector: string;
-  analysis: AnalysisData; // Sekarang menggunakan Object, bukan string
+  analysis?: {
+    interpretasi: string;
+    perbandingan_sektor: string;
+    faktor_positif: string[];
+    risiko: string[];
+    kesimpulan: string;
+  };
   lastAnalyzedTime?: number;
 }
 
@@ -306,601 +243,566 @@ interface SentimentResult {
 
 export default function App() {
   const [ticker, setTicker] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
-  const [isCached, setIsCached] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-
-  const [sentimentState, setSentimentState] = useState<'idle' | 'loading' | 'warming_up' | 'success' | 'error'>('idle');
+  const [error, setError] = useState<ErrorDetail | null>(null);
+  const [sentimentState, setSentimentState] = useState<'idle' | 'loading' | 'success' | 'error' | 'warming_up' | 'missing_token'>('idle');
   const [sentimentData, setSentimentData] = useState<SentimentResult | null>(null);
-  
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const suggestionRef = useRef<HTMLDivElement>(null);
-  const loadingMessageRef = useRef<NodeJS.Timeout | null>(null);
-  const elapsedTimeRef = useRef<NodeJS.Timeout | null>(null);
-  const [showDelayedMessages, setShowDelayedMessages] = useState(false);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (suggestionRef.current && !suggestionRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    inputRef.current?.focus();
   }, []);
 
-  // Reset when loading starts
-  useEffect(() => {
-  if (loading) {
-    setElapsedTime(0);
-    setLoadingMessage('');
-    setShowDelayedMessages(false); // Reset this too
+  const analyzeSentiment = async (analysisText: string) => {
+    if (!analysisText) return;
     
-    elapsedTimeRef.current = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
-    }, 1000);
-
-    return () => {
-      if (elapsedTimeRef.current) clearInterval(elapsedTimeRef.current);
-    };
-  }
-}, [loading]);
-
-  useEffect(() => {
-  if (loading && elapsedTime === 5 && !showDelayedMessages) {
-    setShowDelayedMessages(true);
-  }
-}, [loading, elapsedTime, showDelayedMessages]);
-
-// Set up message cycling when showDelayedMessages becomes true
-useEffect(() => {
-  if (showDelayedMessages) {
-    const messages = [
-      'Sorry this takes quite a while...',
-      'Just wait a little bit more...',
-      'Almost there...',
-      'This is Awkward...'
-    ];
-    
-    setLoadingMessage(messages[0]);
-    
-    let messageIndex = 0;
-    const interval = setInterval(() => {
-      messageIndex = (messageIndex + 1) % messages.length;
-      setLoadingMessage(messages[messageIndex]);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }
-}, [showDelayedMessages]);
-
-  const filteredStocks = TOP_STOCKS.filter(stock => 
-    stock.ticker.toLowerCase().includes(ticker.toLowerCase()) || 
-    stock.name.toLowerCase().includes(ticker.toLowerCase())
-  );
-
-  const handleSelectSuggestion = (selectedTicker: string) => {
-    setTicker(selectedTicker);
-    setShowSuggestions(false);
-  };
-
-  const fetchSentiment = async (textToAnalyze: string) => {
     setSentimentState('loading');
     try {
-      let isSuccess = false;
-      let attempts = 0;
-      let finalResult = null;
-      let errorReason = '';
+      const response = await fetch('/api/sentiment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: analysisText })
+      });
 
-      // Clean the text and keep it under ~400 chars to avoid model limits
-      const cleanedInput = textToAnalyze.replace(/[*#]/g, '').substring(0, 480);
-
-      while (attempts < 3 && !isSuccess) {
-        attempts++;
-        const response = await fetch("/api/sentiment", {
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-          body: JSON.stringify({ text: cleanedInput }),
-        });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         
-        if (response.status === 503) {
-           setSentimentState('warming_up');
-           // Wait 5 seconds and retry (HuggingFace needs time to spin up the container)
-           await new Promise(resolve => setTimeout(resolve, 5000));
-        } else if (response.ok) {
-           finalResult = await response.json();
-           isSuccess = true;
-        } else {
-           const errData = await response.json().catch(() => null);
-           if (response.status === 401) {
-             errorReason = 'missing_token';
-           }
-           break; // Other error, e.g., 429 rate limit or 401 missing token
+        if (response.status === 503 && errorData.error === 'Model is warming up') {
+          setSentimentState('warming_up');
+          setTimeout(() => analyzeSentiment(analysisText), 15000);
+          return;
         }
+        
+        if (response.status === 401 && errorData.error === 'HF_TOKEN missing') {
+          setSentimentState('missing_token' as any);
+          return;
+        }
+        
+        setSentimentState('error');
+        return;
       }
 
-      if (isSuccess && finalResult) {
-        if (Array.isArray(finalResult) && finalResult[0] && Array.isArray(finalResult[0])) {
-           // Find highest score sentiment
-           const highest = finalResult[0].reduce((prev: any, current: any) => (prev.score > current.score) ? prev : current);
-           setSentimentData(highest);
-           setSentimentState('success');
-        } else {
-           setSentimentState('error');
-        }
+      const data = await response.json();
+      
+      if (data && data[0] && data[0][0]) {
+        setSentimentData(data[0][0]);
+        setSentimentState('success');
       } else {
-        if (errorReason === 'missing_token') {
-          setSentimentState('missing_token' as any);
-        } else {
-          setSentimentState('error');
-        }
+        setSentimentState('error');
       }
-    } catch (e) {
-      console.error("HF Inference Error:", e);
+    } catch (err) {
+      console.error('Sentiment analysis failed:', err);
       setSentimentState('error');
     }
   };
 
-  const analyzeStock = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmedTicker = ticker.trim().toUpperCase();
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticker.trim()) return;
+
+    const searchTicker = ticker.toUpperCase().trim();
     
-    // Validasi input
-    if (!trimmedTicker) {
-      setError('Masukkan kode saham terlebih dahulu (misal: BBCA, TLKM, GOTO)');
-      return;
-    }
-    
-    if (trimmedTicker.length > 5) {
-      setError('Kode saham terlalu panjang. Format ticker Indonesia maksimal 4 karakter (misal: BBCA, TLKM).');
-      return;
-    }
-    
-    if (!/^[A-Z0-9.]+$/.test(trimmedTicker)) {
-      setError('Kode saham hanya boleh menggunakan huruf A-Z, angka, atau titik. Contoh: BBCA atau BBCA.JK');
-      return;
-    }
-    
-    setShowSuggestions(false);
     setLoading(true);
     setError(null);
-    setErrorDetail(null);
     setResult(null);
     setSentimentState('idle');
     setSentimentData(null);
 
     try {
-      const rawTicker = trimmedTicker;
-      const searchTicker = rawTicker.includes(".") ? rawTicker : `${rawTicker}.JK`;
-
-      // 1. CACHE CHECK (Returns early if found)
-      const cachedData = getCachedAnalysis(rawTicker);
-      if (cachedData) {
-        setResult(cachedData);
-        setIsCached(true);
-        fetchSentiment(cachedData.analysis?.kesimpulan || cachedData.companyName); 
+      const cached = getCachedAnalysis(searchTicker);
+      if (cached) {
+        setResult(cached);
         setLoading(false);
+        
+        const fullAnalysisText = Object.values(cached.analysis || {}).join(' ');
+        if (fullAnalysisText) {
+          analyzeSentiment(fullAnalysisText);
+        }
         return;
       }
 
-      // 2. FETCH HARD DATA FROM BACKEND PROXY
       const stockData = await fetchStockData(searchTicker);
-      
-      if (!stockData || !stockData.price) {
+      if (!stockData) {
+        setError({
+          message: 'Stock Not Found',
+          suggestion: 'Check ticker symbol or try another stock.',
+          icon: 'Info',
+          retryable: false
+        });
         setLoading(false);
-        setError(`Saham dengan ticker "${rawTicker}" tidak ditemukan di IDX atau data tidak tersedia.\n\nSaran:\n- Pastikan ticker benar (cek di www.idx.co.id)\n- Ticker harus format seperti: BBCA, TLKM, GOTO`);
         return;
       }
 
-      // Hitung P/BV secara dinamis (Backend sudah menjamin datanya dalam IDR)
-      let calculatedPbv = 0;
-      if (stockData.bookValuePerShare && stockData.bookValuePerShare > 0) {
-        calculatedPbv = stockData.price / stockData.bookValuePerShare;
-      }
+      const { price, bookValuePerShare: bvps, sector, name } = stockData;
+      const pbv = bvps > 0 ? price / bvps : 0;
 
-      // 3. CALL BACKEND ANALYSIS API
-      const analyzeResponse = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticker: rawTicker,
-          sector: stockData.sector,
-          price: stockData.price,
-          bvps: stockData.bookValuePerShare,
-          pbv: calculatedPbv
-        })
+      const analysisRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: searchTicker, sector, price, bvps, pbv })
       });
 
-      if (!analyzeResponse.ok) {
-        const errorData = await analyzeResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || `Analysis API failed with status ${analyzeResponse.status}`);
+      if (!analysisRes.ok) {
+        const errorData = await analysisRes.json();
+        setError(parseGeminiError(errorData));
+        setLoading(false);
+        return;
       }
 
-      const aiData = await analyzeResponse.json();
-      const now = Date.now();
+      const analysisData = await analysisRes.json();
 
       const finalResult: AnalysisResult = {
-        ticker: rawTicker,
-        companyName: stockData.name || rawTicker,
-        price: stockData.price || 0,
-        bvps: stockData.bookValuePerShare || 0,
-        pbv: calculatedPbv || 0,
-        sector: stockData.sector || "Umum",
-        analysis: aiData, // Langsung masukkan Object JSON dari API
-        lastAnalyzedTime: now
+        ticker: searchTicker,
+        name,
+        price,
+        bvps,
+        pbv,
+        sector,
+        analysis: analysisData,
+        lastAnalyzedTime: Date.now()
       };
 
-      // === SAVE TO CACHE UPON SUCCESS ===
-      cacheAnalysis(rawTicker, finalResult);
+      cacheAnalysis(searchTicker, finalResult);
       setResult(finalResult);
-      setIsCached(false);
 
-      // Call HuggingFace RoBERTa API (Gunakan kesimpulan saja untuk menghemat token HF)
-      fetchSentiment(finalResult.analysis?.kesimpulan || finalResult.companyName);
+      const fullAnalysisText = Object.values(analysisData).join(' ');
+      if (fullAnalysisText) {
+        analyzeSentiment(fullAnalysisText);
+      }
 
     } catch (err: any) {
-      console.error("Analysis Exception:", err);
-      const errorDetail = parseGeminiError(err);
-      setErrorDetail(errorDetail);
-      setError(errorDetail.message);
+      console.error('Analysis error:', err);
+      setError({
+        message: 'Network Error',
+        suggestion: 'Check your connection and try again.',
+        icon: 'AlertTriangle',
+        retryable: true
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getPbvStatus = (pbv: number) => {
-    if (pbv === 0) return { label: 'N/A (Anomali)', color: 'text-text-dim', icon: Info };
-    if (pbv < 1.0) return { label: 'Undervalued', color: 'text-emerald-500', icon: CheckCircle };
-    if (pbv <= 3.0) return { label: 'Fair Value', color: 'text-accent', icon: Info };
-    return { label: 'Overvalued', color: 'text-rose-500', icon: AlertTriangle };
+  const handleRefresh = () => {
+    if (result?.ticker) {
+      clearCache(result.ticker);
+      setTicker(result.ticker);
+      setTimeout(() => {
+        const form = document.querySelector('form');
+        form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }, 100);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background text-text-main font-sans selection:bg-accent/30 selection:text-accent flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0a0a0f] via-[#0f0f18] to-[#1a1a28]">
+      {/* Animated background grid */}
+      <div className="fixed inset-0 opacity-[0.02] pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(90deg, #10b981 1px, transparent 1px),
+            linear-gradient(0deg, #10b981 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px',
+          animation: 'gridPulse 4s ease-in-out infinite'
+        }}></div>
+      </div>
+
       {/* Header */}
-      <header className="h-[72px] border-b border-border-subtle bg-surface px-6 md:px-10 flex items-center justify-between sticky top-0 z-10 shrink-0">
-        <button 
-          onClick={() => {
-            setResult(null);
-            setTicker('');
-            setError(null);
-            setErrorDetail(null);
-            setSentimentState('idle');
-            setSentimentData(null);
-          }}
-          className="font-serif text-xl md:text-2xl italic tracking-[-0.5px] text-accent font-bold hover:opacity-80 transition-opacity cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background rounded px-2 py-1"
-          title="Back to home"
-        >
-          BGY <span className="text-white text-lg font-normal ml-1">(Beli Ga Ya?)</span>
-        </button>
-        <div className="flex items-center gap-6">
-          <span className="hidden md:inline-flex items-center px-3 py-1 bg-surface-light border border-border-subtle rounded-full text-[11px] text-accent tracking-[0.5px]">
-            AI Engine: Active
-          </span>
+      <header className="border-b border-white/5 bg-black/20 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Cinzel', serif" }}>
+                  BAGEUR <span className="text-emerald-400">CAPITAL</span>
+                </h1>
+                <p className="text-xs text-gray-400 tracking-widest uppercase mt-0.5">Fundamental Analytics Terminal</p>
+              </div>
+            </div>
+            <div className="hidden md:flex items-center gap-6 text-xs text-gray-400 tracking-wider">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                <span>LIVE DATA</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>AI POWERED</span>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 py-8 md:py-10 flex flex-col gap-6">
-        
-        {/* Search / Hero Section */}
-        <div className={cn("bg-surface border border-border-subtle rounded p-6 md:p-10 flex flex-col transition-all duration-300", !result && "items-center text-center mt-4 md:mt-12 max-w-3xl mx-auto w-full")}>
-          {!result && (
-            <>
-              <h2 className="font-serif text-[28px] md:text-[36px] text-white mb-4">Stock Valuation Engine</h2>
-              <p className="text-[15px] leading-[1.6] text-text-dim mb-8">
-                Enter an Indonesian stock ticker to parse fundamental P/BV data and generate logical AI insights.
-              </p>
-            </>
-          )}
-          
-          <form onSubmit={analyzeStock} className={cn("relative flex flex-col md:flex-row gap-4 w-full", !result && "max-w-xl")}>
-            <div className="relative flex-1" ref={suggestionRef}>
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-text-dim" />
-              </div>
-              <input
-                type="text"
-                value={ticker}
-                onChange={(e) => {
-                  setTicker(e.target.value.toUpperCase());
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                placeholder="Enter ticker (e.g., BBCA, TLKM)"
-                className="w-full bg-surface-light border border-border-subtle text-text-main pl-12 pr-4 py-4 text-[15px] rounded focus:outline-none focus:border-accent uppercase placeholder:normal-case transition-colors"
-                disabled={loading}
-              />
-              {/* Dropdown Suggestions */}
-              {showSuggestions && ticker.length > 0 && filteredStocks.length > 0 && (
-                 <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border-subtle rounded shadow-2xl z-50 max-h-64 overflow-y-auto w-full">
-                    {filteredStocks.map((stock) => (
-                       <button 
-                         key={stock.ticker}
-                         type="button"
-                         className="w-full text-left px-4 py-3 hover:bg-surface-light border-b border-border-subtle last:border-b-0 cursor-pointer flex flex-col transition-colors"
-                         onClick={() => handleSelectSuggestion(stock.ticker)}
-                       >
-                          <span className="font-bold text-accent text-[13px]">{stock.ticker}</span>
-                          <span className="text-[11px] text-text-dim">{stock.name}</span>
-                       </button>
-                    ))}
-                 </div>
-              )}
-            </div>
-            
-            <button
-              type="submit"
-              disabled={loading || !ticker.trim()}
-              className="bg-accent text-black uppercase tracking-[1px] text-[13px] font-semibold px-6 md:px-8 py-4 border-none cursor-pointer rounded transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  {elapsedTime >= 5 ? loadingMessage : 'Please wait, currently analyzing...'}
-                </span>
-              ) : (
-                'Analyze'
-              )}
-            </button>
-          </form>
+      {/* Main Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-12">
+        {/* Search Section */}
+        <div className="mb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent leading-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+              Intelligent Stock Analysis
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+              Advanced fundamental metrics powered by AI-driven insights for Indonesian equities
+            </p>
+          </div>
 
-          {error && (
-            <div className="mt-6 w-full text-left bg-surface-light border border-rose-900/50 text-rose-400 p-5 rounded text-[13px] flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="whitespace-pre-wrap leading-relaxed font-semibold">{error}</p>
-                {errorDetail && errorDetail.suggestion && (
-                  <p className="whitespace-pre-wrap leading-relaxed mt-3 opacity-90">{errorDetail.suggestion}</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Results Section */}
-        {result && (
-          <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            
-            {/* Header Information Card */}
-            <div className="bg-surface border border-border-subtle rounded p-6 md:p-8 relative">
-              <div className="flex justify-between items-start mb-4">
-                <div className="text-[10px] uppercase tracking-[2px] text-text-dim">Target Entity</div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-[10px] uppercase tracking-[2px] text-text-dim">
-                    Last Analyzed: <span className="text-accent font-semibold">{formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
-                    {isCached && <span className="ml-2 inline-block px-2 py-0.5 bg-accent/10 text-accent/70 rounded text-[9px]">CACHED</span>}
+          <form onSubmit={handleAnalyze} className="max-w-2xl mx-auto">
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl opacity-20 blur group-hover:opacity-30 transition duration-300"></div>
+              <div className="relative bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="pl-4">
+                    <Search className="w-5 h-5 text-gray-400" />
                   </div>
-                  <button
-                    onClick={() => {
-                      clearCache(result.ticker);
-                      analyzeStock();
-                    }}
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={ticker}
+                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                    placeholder="Enter ticker symbol (e.g., BBCA.JK, TLKM.JK)"
+                    className="flex-1 bg-transparent text-white placeholder-gray-500 text-lg py-4 outline-none tracking-wide"
                     disabled={loading}
-                    className="text-[11px] px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent border border-accent/30 rounded transition-colors disabled:opacity-50 cursor-pointer font-medium"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !ticker.trim()}
+                    className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-700 disabled:to-gray-800 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/20 disabled:shadow-none tracking-wide disabled:text-gray-400"
                   >
-                    {loading ? 'Analyzing...' : 'Re-analyze'}
+                    {loading ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Analyzing</span>
+                      </div>
+                    ) : (
+                      'Analyze'
+                    )}
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6">
-                <div>
-                  <h2 className="font-serif text-[28px] md:text-[32px] text-white mb-3">{result.companyName}</h2>
-                  <div className="flex gap-3">
-                    <span className="inline-flex items-center px-3 py-1 bg-surface-light border border-border-subtle rounded-full text-[11px] text-text-main font-mono">
-                      {result.ticker}
-                    </span>
-                    <span className="inline-flex items-center px-3 py-1 bg-surface-light border border-border-subtle rounded-full text-[11px] text-text-dim uppercase tracking-[1px]">
-                      {result.sector}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-left md:text-right">
-                  <div className="text-[11px] uppercase tracking-[1px] text-text-dim mb-1">Market Price</div>
-                  <div className="font-serif text-[24px] md:text-[28px] text-accent flex items-baseline gap-1.5 md:justify-end">
-                    <span className="text-[16px] md:text-[18px] text-accent/80">Rp</span>
-                    <span>{result.price.toLocaleString('id-ID')}</span>
-                  </div>
-                </div>
-              </div>
             </div>
+          </form>
 
-            {/* Data Pipeline / Grids */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* P/BV Card */}
-              {(() => {
-                const status = getPbvStatus(result.pbv);
-                return (
-                  <div className="bg-surface-light border border-border-subtle p-6 rounded flex flex-col justify-between min-h-[140px]">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="text-[12px] font-semibold text-text-main flex items-center gap-2">
-                        <Calculator className="w-4 h-4 text-text-dim" /> P/BV Ratio
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[32px] md:text-[40px] font-serif text-white mb-2 leading-none">
-                        {result.pbv.toFixed(2)}<span className="text-text-dim text-[20px] md:text-[24px]">x</span>
-                      </div>
-                      <div className={cn("text-[10px] uppercase tracking-[2px] px-2 py-1 inline-block rounded bg-surface border border-border-subtle", status.color)}>
-                        {status.label}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* BVPS Card */}
-              <div className="bg-surface-light border border-border-subtle p-6 rounded flex flex-col justify-between min-h-[140px]">
-                <div className="text-[12px] font-semibold text-text-main flex items-center gap-2 mb-4">
-                  <Banknote className="w-4 h-4 text-text-dim" /> Book Value / Share
-                </div>
-                <div>
-                  <div className="text-[24px] md:text-[28px] font-serif text-white leading-tight mb-2">
-                    {/* Render angka desimal jika di bawah 1, sebaliknya bulatkan normal */}
-                    Rp {result.bvps > 0 && result.bvps < 1 
-                        ? result.bvps.toFixed(3) 
-                        : Math.round(result.bvps).toLocaleString('id-ID')}
-                  </div>
-                  <div className="text-[10px] uppercase tracking-[2px] text-text-dim">BVPS</div>
-                </div>
-              </div>
-
-              {/* Sector Card */}
-              <div className="bg-surface-light border border-border-subtle p-6 rounded flex flex-col justify-between min-h-[140px]">
-                <div className="text-[12px] font-semibold text-text-main flex items-center gap-2 mb-4">
-                  <Building className="w-4 h-4 text-text-dim" /> Industry Check
-                </div>
-                <div>
-                  <div className="text-[20px] font-serif text-white leading-tight">
-                    {result.sector}
-                  </div>
-                </div>
-              </div>
+          {/* Info Pills */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6 text-xs">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-sm">
+              <Calculator className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-gray-300">PBV Analysis</span>
             </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-sm">
+              <BrainCircuit className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-gray-300">AI Insights</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full backdrop-blur-sm">
+              <Info className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-gray-300">Real-time Data</span>
+            </div>
+          </div>
+        </div>
 
-            {/* AI Analysis Block */}
-            <div className="bg-surface border border-border-subtle rounded p-6 md:p-8">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 border-b border-border-subtle pb-4">
-                <div className="text-[10px] uppercase tracking-[2px] text-text-dim flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" /> Logic Synthesis
+        {/* Error State */}
+        {error && (
+          <div className="max-w-2xl mx-auto mb-8 animate-fade-in">
+            <div className="bg-gradient-to-br from-red-950/50 to-red-900/30 border border-red-500/30 rounded-2xl p-6 backdrop-blur-sm">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
                 </div>
-                
-                {/* Sentiment Pill Group */}
-                <div className="flex flex-col gap-3 w-full lg:w-auto">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {sentimentState === 'loading' && (
-                      <span className="flex items-center gap-2 text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
-                        <Loader2 className="w-3 h-3 animate-spin" /> NLP Sentiment...
-                      </span>
-                    )}
-                    {sentimentState === 'warming_up' && (
-                      <span className="flex items-center gap-2 text-[11px] text-amber-500 px-3 py-1 bg-surface-light border border-border-subtle rounded-full">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Warming up HuggingFace Model...
-                      </span>
-                    )}
-                    {sentimentState === 'error' && (
-                      <span className="text-[11px] text-text-dim px-3 py-1 bg-surface-light border border-border-subtle rounded-full" title="Rate limit or endpoint error from HuggingFace Free Tier">
-                        Sentiment HF: Failed
-                      </span>
-                    )}
-                    {sentimentState === 'missing_token' as any && (
-                      <span className="text-[11px] text-amber-500 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full" title="Requires HF_TOKEN token">
-                        HF_TOKEN required for Sentiment AI
-                      </span>
-                    )}
-                    {sentimentState === 'success' && sentimentData && (
-                      <span className={cn(
-                        "text-[11px] uppercase tracking-[0.5px] px-3 py-1 rounded-full border shadow-sm font-bold flex items-center gap-1",
-                        sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
-                        sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 text-rose-400 border-rose-500/30" :
-                        "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                      )}>
-                        <BrainCircuit className="w-3 h-3" />
-                        Sentiment: {
-                          sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? 'Positive' : 
-                          sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? 'Negative' : 
-                          'Neutral'
-                        } ({Math.round(sentimentData.score * 100)}%)
-                      </span>
-                    )}
-
-                    <span className="hidden md:inline-flex items-center px-3 py-1 bg-accent/[0.05] border border-accent/30 rounded-full text-[11px] text-accent tracking-[0.5px]">
-                      Gemini Search AI
-                    </span>
-                  </div>
-
-                  {/* Sentiment Explanation Tooltip */}
-                  {sentimentState === 'success' && sentimentData && (
-                    <div className={cn(
-                      "text-[12px] leading-[1.5] px-3 py-2 rounded border",
-                      sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' 
-                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" :
-                      sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' 
-                        ? "bg-rose-500/10 text-rose-300 border-rose-500/30" :
-                        "bg-blue-500/10 text-blue-300 border-blue-500/30"
-                    )}>
-                      {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
-                        <div>
-                          <strong className="block mb-1">Sentiment Positif (Bullish)</strong>
-                          <p>Analisis menunjukkan prospek menguntungkan, potensi pertumbuhan, atau faktor-faktor positif dominan. Namun tetap lakukan riset lebih lanjut sebelum berinvestasi.</p>
-                        </div>
-                      ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
-                        <div>
-                          <strong className="block mb-1">Sentiment Negatif (Bearish)</strong>
-                          <p>Analisis menunjukkan risiko tinggi, potensi penurunan, atau faktor-faktor negatif dominan. Pertimbangkan dengan hati-hati sebelum membeli.</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <strong className="block mb-1">Sentiment Netral (Hold)</strong>
-                          <p>Analisis menunjukkan prospek seimbang dengan faktor positif dan negatif yang setara. Tunggu sinyal yang lebih jelas atau cari informasi tambahan.</p>
-                        </div>
-                      )}
-                      <p className="text-[11px] mt-2 opacity-80">Persentase disebelah Sentimen adalah Confidence Score, dimana semakin tinggi persentase = model AI semakin yakin dengan penilaiannya.</p>
-                    </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-red-300 mb-1">{error.message}</h3>
+                  <p className="text-red-200/80 leading-relaxed">{error.suggestion}</p>
+                  {error.retryable && (
+                    <button
+                      onClick={() => handleAnalyze({ preventDefault: () => {} } as any)}
+                      className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition-colors text-sm font-medium"
+                    >
+                      Try Again
+                    </button>
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results */}
+        {result && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Stock Header Card */}
+            <div className="bg-gradient-to-br from-gray-900/90 to-black/90 border border-white/10 rounded-2xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+              {/* Decorative gradient overlay */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-full blur-3xl"></div>
               
-              <div className="flex flex-col gap-6 text-text-main">
-                {/* Interpretasi & Perbandingan */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-surface-light border border-border-subtle p-5 rounded-xl">
-                    <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Interpretasi Metrik</h3>
-                    <p className="leading-relaxed text-[14px] text-text-dim">{result.analysis?.interpretasi}</p>
-                  </div>
-                  <div className="bg-surface-light border border-border-subtle p-5 rounded-xl">
-                    <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Perbandingan Sektor</h3>
-                    <p className="leading-relaxed text-[14px] text-text-dim">{result.analysis?.perbandingan_sektor}</p>
-                  </div>
-                </div>
-
-                {/* Faktor Positif & Risiko */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="border border-emerald-900/50 bg-emerald-950/10 p-5 rounded-xl">
-                    <h3 className="text-emerald-400 font-semibold text-[13px] mb-4 uppercase tracking-wider">Faktor Positif</h3>
-                    <ul className="list-disc pl-5 space-y-2 text-[14px] text-text-dim">
-                      {result.analysis?.faktor_positif?.map((poin: string, index: number) => (
-                        <li key={index} className="leading-relaxed">{poin}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="border border-rose-900/50 bg-rose-950/10 p-5 rounded-xl">
-                    <h3 className="text-rose-400 font-semibold text-[13px] mb-4 uppercase tracking-wider">Risiko</h3>
-                    <ul className="list-disc pl-5 space-y-2 text-[14px] text-text-dim">
-                      {result.analysis?.risiko?.map((poin: string, index: number) => (
-                        <li key={index} className="leading-relaxed">{poin}</li>
-                      ))}
-                    </ul>
+              <div className="relative">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="text-4xl font-bold text-white tracking-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+                        {result.ticker}
+                      </h2>
+                      {result.lastAnalyzedTime && (
+                        <button
+                          onClick={handleRefresh}
+                          className="p-2 hover:bg-white/5 rounded-lg transition-colors group"
+                          title="Refresh analysis"
+                        >
+                          <RefreshCw className="w-4 h-4 text-gray-400 group-hover:text-emerald-400 transition-colors" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xl text-gray-300 mb-1">{result.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400 text-xs font-medium tracking-wide">
+                        {result.sector}
+                      </span>
+                      {result.lastAnalyzedTime && (
+                        <span className="text-xs text-gray-500">
+                          Cached • {new Date(result.lastAnalyzedTime).toLocaleString('id-ID')}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Kesimpulan */}
-                <div className="bg-accent/5 border border-accent/20 p-5 rounded-xl mt-2">
-                  <h3 className="text-accent font-semibold text-[13px] mb-3 uppercase tracking-wider">Kesimpulan Pragmatis</h3>
-                  <p className="leading-relaxed text-[14px] text-white font-medium">{result.analysis?.kesimpulan}</p>
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Price Card */}
+                  <div className="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-xl p-6 backdrop-blur-sm hover:border-emerald-500/30 transition-colors group">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <span className="text-xs text-gray-400 uppercase tracking-widest">Market Price</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-1" style={{ fontFamily: "'Cinzel', serif" }}>
+                      Rp {Math.round(result.price).toLocaleString('id-ID')}
+                    </div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">IDR</div>
+                  </div>
+
+                  {/* BVPS Card */}
+                  <div className="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-xl p-6 backdrop-blur-sm hover:border-blue-500/30 transition-colors group">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                        <Banknote className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <span className="text-xs text-gray-400 uppercase tracking-widest">Book Value</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-1" style={{ fontFamily: "'Cinzel', serif" }}>
+                      Rp {result.bvps > 0 && result.bvps < 1 
+                          ? result.bvps.toFixed(3) 
+                          : Math.round(result.bvps).toLocaleString('id-ID')}
+                    </div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">Per Share</div>
+                  </div>
+
+                  {/* PBV Card */}
+                  <div className="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-xl p-6 backdrop-blur-sm hover:border-purple-500/30 transition-colors group">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
+                        <Calculator className="w-4 h-4 text-purple-400" />
+                      </div>
+                      <span className="text-xs text-gray-400 uppercase tracking-widest">Price to Book</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-3xl font-bold text-white" style={{ fontFamily: "'Cinzel', serif" }}>
+                        {result.pbv.toFixed(2)}x
+                      </div>
+                      <div className={cn(
+                        "px-2 py-0.5 rounded text-xs font-semibold",
+                        result.pbv < 1 ? "bg-emerald-500/20 text-emerald-300" :
+                        result.pbv < 1.5 ? "bg-blue-500/20 text-blue-300" :
+                        result.pbv < 3 ? "bg-yellow-500/20 text-yellow-300" :
+                        "bg-red-500/20 text-red-300"
+                      )}>
+                        {result.pbv < 1 ? "Undervalued" :
+                         result.pbv < 1.5 ? "Fair" :
+                         result.pbv < 3 ? "Premium" :
+                         "Expensive"}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* AI Analysis Section */}
+            {result.analysis && (
+              <div className="bg-gradient-to-br from-gray-900/90 to-black/90 border border-white/10 rounded-2xl backdrop-blur-xl shadow-2xl overflow-hidden">
+                {/* Analysis Header */}
+                <div className="border-b border-white/5 bg-gradient-to-r from-emerald-950/30 to-transparent p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                        <BrainCircuit className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white tracking-tight" style={{ fontFamily: "'Cinzel', serif" }}>
+                          AI Analysis
+                        </h3>
+                        <p className="text-xs text-gray-400 tracking-wider uppercase">Powered by Gemini</p>
+                      </div>
+                    </div>
+
+                    {/* Sentiment Badge */}
+                    <div className="flex items-center gap-3">
+                      {sentimentState === 'loading' && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                          <span className="text-xs text-gray-400">Analyzing sentiment...</span>
+                        </div>
+                      )}
+                      {sentimentState === 'warming_up' && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-full">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          <span className="text-xs text-amber-400">Model warming up...</span>
+                        </div>
+                      )}
+                      {sentimentState === 'success' && sentimentData && (
+                        <div className={cn(
+                          "px-4 py-2 rounded-full border font-semibold text-xs tracking-wider flex items-center gap-2",
+                          sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' 
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" :
+                          sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' 
+                            ? "bg-red-500/10 border-red-500/30 text-red-300" :
+                            "bg-blue-500/10 border-blue-500/30 text-blue-300"
+                        )}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? 'BULLISH' : 
+                           sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? 'BEARISH' : 
+                           'NEUTRAL'}
+                          <span className="opacity-70">•</span>
+                          <span>{Math.round(sentimentData.score * 100)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sentiment Explanation */}
+                  {sentimentState === 'success' && sentimentData && (
+                    <div className={cn(
+                      "mt-4 p-4 rounded-xl border text-sm leading-relaxed",
+                      sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' 
+                        ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-200/90" :
+                      sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' 
+                        ? "bg-red-500/5 border-red-500/20 text-red-200/90" :
+                        "bg-blue-500/5 border-blue-500/20 text-blue-200/90"
+                    )}>
+                      {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                        <p><strong className="font-semibold">Positive Outlook:</strong> Analysis indicates favorable prospects with dominant positive factors. However, conduct thorough research before investing.</p>
+                      ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                        <p><strong className="font-semibold">Negative Outlook:</strong> Analysis shows elevated risks with dominant negative factors. Consider carefully before purchasing.</p>
+                      ) : (
+                        <p><strong className="font-semibold">Neutral Outlook:</strong> Analysis shows balanced prospects with equal positive and negative factors. Wait for clearer signals or seek additional information.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Analysis Content */}
+                <div className="p-8 space-y-6">
+                  {/* Interpretation & Sector Comparison */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 rounded-xl p-6 hover:border-emerald-500/20 transition-colors">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-6 bg-emerald-500 rounded-full"></div>
+                        <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Metric Interpretation</h4>
+                      </div>
+                      <p className="text-gray-300 leading-relaxed">{result.analysis.interpretasi}</p>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 rounded-xl p-6 hover:border-blue-500/20 transition-colors">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                        <h4 className="text-sm font-bold text-blue-400 uppercase tracking-widest">Sector Comparison</h4>
+                      </div>
+                      <p className="text-gray-300 leading-relaxed">{result.analysis.perbandingan_sektor}</p>
+                    </div>
+                  </div>
+
+                  {/* Positive Factors & Risks */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-gradient-to-br from-emerald-950/20 to-transparent border border-emerald-500/20 rounded-xl p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                        <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Positive Factors</h4>
+                      </div>
+                      <ul className="space-y-3">
+                        {result.analysis.faktor_positif?.map((poin: string, index: number) => (
+                          <li key={index} className="flex items-start gap-3 text-gray-300 leading-relaxed">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 flex-shrink-0"></div>
+                            <span>{poin}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-red-950/20 to-transparent border border-red-500/20 rounded-xl p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                        <h4 className="text-sm font-bold text-red-400 uppercase tracking-widest">Risk Factors</h4>
+                      </div>
+                      <ul className="space-y-3">
+                        {result.analysis.risiko?.map((poin: string, index: number) => (
+                          <li key={index} className="flex items-start gap-3 text-gray-300 leading-relaxed">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-2 flex-shrink-0"></div>
+                            <span>{poin}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Conclusion */}
+                  <div className="bg-gradient-to-br from-purple-950/20 to-transparent border border-purple-500/20 rounded-xl p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-purple-400" />
+                      </div>
+                      <h4 className="text-sm font-bold text-purple-400 uppercase tracking-widest">Pragmatic Conclusion</h4>
+                    </div>
+                    <p className="text-white font-medium text-lg leading-relaxed">{result.analysis.kesimpulan}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
-      
+
       {/* Footer */}
-      <footer className="border-t border-border-subtle bg-surface mt-auto py-5 relative shrink-0">
-        <div className="max-w-5xl mx-auto px-6 text-center md:text-left">
-          <p className="text-[11px] uppercase tracking-[1px] text-text-dim leading-[1.6]">
-            <strong className="text-text-main font-semibold">Disclaimer:</strong> 
-            {" "}Educative analysis only. Not financial advice. Data may experience latency.
-          </p>
+      <footer className="border-t border-white/5 bg-black/20 backdrop-blur-xl mt-auto py-6">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
+            <p className="tracking-wide">
+              <strong className="text-gray-300 font-semibold">Disclaimer:</strong> Educational analysis only. Not financial advice. Data may experience latency.
+            </p>
+            <p className="tracking-widest uppercase">© 2026 Bageur Capital Analytics</p>
+          </div>
         </div>
       </footer>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+        
+        @keyframes gridPulse {
+          0%, 100% { opacity: 0.02; }
+          50% { opacity: 0.04; }
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.6s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
