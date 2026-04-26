@@ -761,7 +761,7 @@ useEffect(() => {
                   <Building className="w-4 h-4 text-text-dim" /> Industry Check
                 </div>
                 {/* Bagian ini diubah agar mengisi sisa ruang dan menengahkan konten */}
-                <div className="flex-1 flex items-center justify-center pb-2">
+                <div className="flex-1 flex items-left justify-center pb-2">
                   <div className="text-[20px] md:text-[22px] font-serif text-white leading-tight text-center">
                     {result.sector}
                   </div>
