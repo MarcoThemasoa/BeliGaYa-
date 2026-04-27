@@ -352,7 +352,7 @@ export default function App() {
           {!result && (
             <div className="animate-fade-in mb-10">
               <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 tracking-tight">Financial Clarity,<br/>Powered by AI.</h1>
-              <p className="text-text-dim text-base md:text-lg">Parse fundamental P/BV data and synthesize market context instantly.</p>
+              <p className="text-text-dim text-base md:text-lg">Analyze Indonesian fundamental P/BV Stock data and synthesize market context instantly.</p>
             </div>
           )}
           
