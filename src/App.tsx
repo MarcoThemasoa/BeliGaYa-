@@ -445,7 +445,7 @@ export default function App() {
                 <p className="text-text-dim text-xs uppercase tracking-widest mb-2">Market Price</p>
                 <div className="font-serif text-3xl md:text-4xl text-white">
                   {/* Rp MADE GREEN */}
-                  <span className="text-xl text-accent mr-1 font-serif font-medium">Rp</span>
+                  <span className="text-2xl md:text-3xl text-accent mr-2 font-serif">Rp</span>
                   {result.price.toLocaleString('id-ID')}
                 </div>
               </div>
@@ -458,9 +458,9 @@ export default function App() {
                 <div className="flex items-center gap-2 text-text-dim text-xs uppercase tracking-widest mb-4">
                   <Banknote className="w-4 h-4" /> Book Value Per Share
                 </div>
-                <div className="text-3xl font-serif text-white">
-                  {/* Rp MADE GREEN */}
-                  <span className="text-xl text-accent mr-1 font-serif font-medium">Rp</span>
+                <div className="text-3xl md:text-4xl font-serif text-white">
+                  {/* Rp is bigger */}
+                  <span className="text-2xl md:text-3xl text-accent mr-2 font-serif">Rp</span>
                   {result.bvps > 0 && result.bvps < 1 ? result.bvps.toFixed(3) : Math.round(result.bvps).toLocaleString('id-ID')}
                 </div>
               </div>
@@ -478,9 +478,9 @@ export default function App() {
                         {status.label}
                       </span>
                     </div>
-                    <div className="text-4xl font-serif text-white">
-                      {/* x MADE GREEN */}
-                      {result.pbv.toFixed(2)}<span className="text-2xl text-accent ml-1 font-serif font-medium">x</span>
+                    <div className="text-4xl md:text-5xl font-serif text-white">
+                      {/* x is bigger */}
+                      {result.pbv.toFixed(2)}<span className="text-3xl md:text-4xl text-accent ml-2 font-serif">x</span>
                     </div>
                   </div>
                 );
@@ -503,16 +503,24 @@ export default function App() {
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4 w-full lg:justify-end">
                   {sentimentState === 'success' && sentimentData ? (
                     <>
-                      {/* Sentiment Explanation (Left on Desktop, Bottom on Mobile) */}
-                      <div className="text-xs text-text-dim leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5 max-w-sm lg:text-right order-2 lg:order-1">
-                        {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
-                          <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
-                        ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
-                          <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
-                        ) : (
-                          <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
-                        )}
-                        <p>Percentage score indicated the AI's level of confidence in the sentiment classification.</p>
+                      {/* Premium Sentiment Explanation Box */}
+                      <div className="flex flex-col bg-gradient-to-br from-white/[0.04] to-transparent p-5 md:p-6 rounded-2xl border border-white/10 max-w-md lg:text-right order-2 lg:order-1 shadow-2xl backdrop-blur-md transition-all">
+                        <div className="text-[13px] md:text-sm text-white/90 leading-relaxed font-medium">
+                          {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                            <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
+                          ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                            <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
+                          ) : (
+                            <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
+                          )}
+                        </div>
+                        
+                        {/* Elegant separator line */}
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          <p className="text-xs text-text-dim/80 leading-relaxed">
+                            Percentage score indicated the AI's level of confidence in the sentiment classification.
+                          </p>
+                        </div>
                       </div>
 
                       {/* Sentiment Pill (Right on Desktop, Top on Mobile) */}
