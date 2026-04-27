@@ -329,14 +329,20 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12 py-12 flex flex-col gap-10">
+      <main className={cn(
+        "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12 flex flex-col",
+        !result ? "justify-center" : "py-12 gap-10"
+      )}>
         
         {/* Elegant Search / Hero */}
-        <div className={cn("transition-all duration-700 ease-out", !result ? "mt-24 md:mt-32 max-w-2xl mx-auto w-full text-center" : "w-full")}>
+        <div className={cn(
+          "transition-all duration-700 ease-out w-full", 
+          !result ? "max-w-2xl mx-auto text-center pb-40" : ""
+        )}>
           {!result && (
             <div className="animate-fade-in mb-10">
               <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 tracking-tight">Financial Clarity,<br/>Powered by AI.</h1>
-              <p className="text-text-dim text-base md:text-lg">Parse fundamental P/BV data and synthesize market context instantly.</p>
+              <p className="text-text-dim text-base md:text-lg">Parse fundamental Indonesian Stocks P/BV data and synthesize market context instantly.</p>
             </div>
           )}
           
@@ -409,7 +415,7 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-fade-in pb-12">
             
             {/* Header / Identity Strip */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/10">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-white/10">
               <div>
                 <div className="flex items-center gap-3 mb-3">
                   <span className="px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold tracking-widest">{result.ticker}</span>
@@ -417,7 +423,22 @@ export default function App() {
                 </div>
                 <h2 className="font-serif text-4xl md:text-5xl text-white leading-tight">{result.companyName}</h2>
               </div>
-              <div className="text-left md:text-right">
+              
+              <div className="text-left md:text-right flex flex-col md:items-end">
+                {/* MOVED TO TOP: Timestamp & Refresh Button */}
+                <div className="flex items-center gap-3 mb-4 md:mb-6 text-xs text-text-dim bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+                  <span>Updated {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
+                  {isCached && <span className="px-1.5 py-0.5 rounded bg-white/10 text-white text-[10px] font-medium tracking-wider">CACHED</span>}
+                  <span className="text-white/20">•</span>
+                  <button
+                    onClick={() => { clearCache(result.ticker); analyzeStock(); }}
+                    disabled={loading}
+                    className="text-white hover:text-accent transition-colors underline underline-offset-4"
+                  >
+                    {loading ? 'Updating...' : 'Refresh'}
+                  </button>
+                </div>
+
                 <p className="text-text-dim text-xs uppercase tracking-widest mb-2">Market Price</p>
                 <div className="font-serif text-3xl md:text-4xl text-accent">
                   <span className="text-xl text-accent/70 mr-1">Rp</span>
@@ -463,8 +484,8 @@ export default function App() {
             {/* AI Analysis Section */}
             <div className="glass-panel overflow-hidden mt-4">
               {/* Analysis Header & Sentiment */}
-              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
+              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                <div className="flex items-center gap-4 mt-1">
                   <div className="p-2 bg-white/10 rounded-lg text-white"><TrendingUp className="w-5 h-5" /></div>
                   <div>
                     <h3 className="text-white font-medium">AI Synthesis</h3>
@@ -472,27 +493,41 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Sentiment Readout */}
-                <div className="flex items-center">
+                {/* Sentiment Readout & Explanation */}
+                <div className="flex flex-col lg:items-end gap-3 max-w-sm">
                   {sentimentState === 'success' && sentimentData ? (
-                    <div className={cn(
-                      "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md",
-                      sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
-                      sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
-                      "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                    )}>
-                      <BrainCircuit className="w-4 h-4" />
-                      <div className="flex flex-col">
-                        <span className="text-[10px] uppercase tracking-widest opacity-80">Market Sentiment</span>
-                        <span className="text-sm font-bold">
-                          {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? 'Bullish' : 
-                           sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? 'Bearish' : 'Neutral'} 
-                          {' '}({Math.round(sentimentData.score * 100)}%)
-                        </span>
+                    <>
+                      <div className={cn(
+                        "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md w-fit",
+                        sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                        sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
+                        "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                      )}>
+                        <BrainCircuit className="w-4 h-4" />
+                        <div className="flex flex-col text-left">
+                          <span className="text-[10px] uppercase tracking-widest opacity-80">Market Sentiment</span>
+                          <span className="text-sm font-bold">
+                            {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? 'Bullish' : 
+                             sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? 'Bearish' : 'Neutral'} 
+                            {' '}({Math.round(sentimentData.score * 100)}%)
+                          </span>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* BROUGHT BACK: Sentiment Explanation Block */}
+                      <div className="text-xs text-text-dim leading-relaxed lg:text-right bg-white/[0.02] p-3 rounded-lg border border-white/5">
+                        {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                          <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
+                        ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                          <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
+                        ) : (
+                          <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
+                        )}
+                        <p className="text-[10px] opacity-60 mt-2">Percentage indicates the AI model's confidence score.</p>
+                      </div>
+                    </>
                   ) : (
-                    <div className="flex items-center gap-2 text-xs text-text-dim">
+                    <div className="flex items-center gap-2 text-xs text-text-dim mt-2">
                       {sentimentState === 'loading' && <><Loader2 className="w-3 h-3 animate-spin" /> Processing NLP...</>}
                       {sentimentState === 'warming_up' && <span className="text-amber-500">Warming up Model...</span>}
                       {sentimentState === 'error' && <span>Sentiment Unavailable</span>}
@@ -553,21 +588,6 @@ export default function App() {
                   <p className="text-white leading-relaxed font-medium">{result.analysis?.kesimpulan}</p>
                 </div>
                 
-              </div>
-              
-              {/* Footer Meta */}
-              <div className="bg-black/20 px-6 py-4 flex items-center justify-between text-xs text-text-dim border-t border-white/5">
-                <div className="flex items-center gap-2">
-                  <span>Last Computed: {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
-                  {isCached && <span className="px-2 py-0.5 rounded bg-white/10 text-white font-medium">CACHED</span>}
-                </div>
-                <button
-                  onClick={() => { clearCache(result.ticker); analyzeStock(); }}
-                  disabled={loading}
-                  className="hover:text-white transition-colors underline underline-offset-4"
-                >
-                  {loading ? 'Re-analyzing...' : 'Force Refresh Data'}
-                </button>
               </div>
             </div>
           </div>
