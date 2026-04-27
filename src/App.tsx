@@ -445,7 +445,7 @@ export default function App() {
                 <p className="text-text-dim text-xs uppercase tracking-widest mb-2">Market Price</p>
                 <div className="font-serif text-3xl md:text-4xl text-white">
                   {/* Rp MADE GREEN */}
-                  <span className="text-xl text-accent mr-1 font-sans font-medium">Rp</span>
+                  <span className="text-xl text-accent mr-1 font-serif font-medium">Rp</span>
                   {result.price.toLocaleString('id-ID')}
                 </div>
               </div>
@@ -460,7 +460,7 @@ export default function App() {
                 </div>
                 <div className="text-3xl font-serif text-white">
                   {/* Rp MADE GREEN */}
-                  <span className="text-xl text-accent mr-1 font-sans font-medium">Rp</span>
+                  <span className="text-xl text-accent mr-1 font-serif font-medium">Rp</span>
                   {result.bvps > 0 && result.bvps < 1 ? result.bvps.toFixed(3) : Math.round(result.bvps).toLocaleString('id-ID')}
                 </div>
               </div>
@@ -480,7 +480,7 @@ export default function App() {
                     </div>
                     <div className="text-4xl font-serif text-white">
                       {/* x MADE GREEN */}
-                      {result.pbv.toFixed(2)}<span className="text-2xl text-accent ml-1 font-sans font-medium">x</span>
+                      {result.pbv.toFixed(2)}<span className="text-2xl text-accent ml-1 font-serif font-medium">x</span>
                     </div>
                   </div>
                 );
@@ -512,6 +512,7 @@ export default function App() {
                         ) : (
                           <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
                         )}
+                        <p>Percentage score indicated the AI's level of confidence in the sentiment classification.</p>
                       </div>
 
                       {/* Sentiment Pill (Right on Desktop, Top on Mobile) */}
