@@ -183,6 +183,7 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [showDelayedMessages, setShowDelayedMessages] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const suggestionRef = useRef<HTMLDivElement>(null);
   const elapsedTimeRef = useRef<NodeJS.Timeout | null>(null);
@@ -193,6 +194,14 @@ export default function App() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -330,7 +339,7 @@ export default function App() {
       </header>
 
       <main className={cn(
-        "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12 flex flex-col",
+        "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-16 flex flex-col",
         !result ? "" : "py-12 gap-10"
       )}>
         
@@ -358,7 +367,7 @@ export default function App() {
                 value={ticker}
                 onChange={(e) => { setTicker(e.target.value.toUpperCase()); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
-                placeholder="Enter ticker symbol (e.g. BBCA)"
+                placeholder={isMobile ? "e.g. BBCA" : "Enter ticker symbol (e.g. BBCA)"}
                 // Text base on mobile, text-lg on desktop. Adjusted padding to prevent squishing.
                 className="w-full bg-surface border border-border-subtle rounded-full py-4 md:py-5 pl-12 md:pl-14 pr-[110px] md:pr-32 text-white placeholder:text-text-dim/50 focus:outline-none focus:border-accent/50 focus:bg-white/5 transition-all uppercase tracking-widest text-base md:text-lg shadow-inner"
                 disabled={loading}
@@ -388,6 +397,9 @@ export default function App() {
                           <ArrowRight className="w-4 h-4 text-white/0 group-hover/item:text-accent shrink-0 transition-all -translate-x-4 group-hover/item:translate-x-0" />
                        </button>
                     ))}
+                    <div className="px-5 md:px-6 py-3 bg-white/2.5 border-t border-border-subtle text-xs text-text-dim italic">
+                      Results shown are top stocks only — if u can find it in IDX you can find it here.
+                    </div>
                  </div>
               )}
             </div>
