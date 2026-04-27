@@ -339,16 +339,15 @@ export default function App() {
       </header>
 
       <main className={cn(
-        "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-16 flex flex-col",
+        "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12 flex flex-col",
         !result ? "" : "py-12 gap-10"
       )}>
         
         {/* Elegant Search / Hero */}
         <div className={cn(
           "transition-all duration-700 ease-out w-full", 
-          // mt-[15vh] visually centers it without flexbox jumping
-          // pb-[320px] physically reserves empty space for the absolute dropdown so it PUSHES the footer down
-          !result ? "max-w-2xl mx-auto text-center mt-[12vh] md:mt-[15vh] pb-[320px]" : ""
+          // Bumped the padding to pb-[400px] to guarantee the footer is pushed far down
+          !result ? "max-w-2xl mx-auto text-center mt-[10vh] md:mt-[15vh] pb-[400px] md:pb-[450px]" : ""
         )}>
           {!result && (
             <div className="animate-fade-in mb-10">
@@ -383,7 +382,8 @@ export default function App() {
 
               {/* Suggestions Flyout */}
               {showSuggestions && ticker.length > 0 && filteredStocks.length > 0 && (
-                 <div className="absolute top-full mt-3 left-0 right-0 glass-panel overflow-hidden z-50">
+                 // Added max-h-[260px] and overflow-y-auto to make the list scrollable safely
+                 <div className="absolute top-full mt-3 left-0 right-0 glass-panel overflow-hidden z-50 max-h-[260px] overflow-y-auto">
                     {filteredStocks.slice(0, 5).map((stock) => (
                        <button 
                          key={stock.ticker} type="button"
@@ -397,9 +397,6 @@ export default function App() {
                           <ArrowRight className="w-4 h-4 text-white/0 group-hover/item:text-accent shrink-0 transition-all -translate-x-4 group-hover/item:translate-x-0" />
                        </button>
                     ))}
-                    <div className="px-5 md:px-6 py-3 bg-white/2.5 border-t border-border-subtle text-xs text-text-dim italic">
-                      Results shown are top stocks only — if u can find it in IDX you can find it here.
-                    </div>
                  </div>
               )}
             </div>
