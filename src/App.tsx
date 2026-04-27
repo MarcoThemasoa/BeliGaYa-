@@ -431,20 +431,16 @@ export default function App() {
           <div className="flex flex-col gap-8 animate-fade-in pb-12">
             
             {/* Header / Identity Strip */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-white/10">
-              <div>
-                <div className="flex items-center gap-3 mb-3">
+            <div className="flex flex-col gap-5 md:gap-6 pb-6 border-b border-white/10">
+              
+              {/* TOP ROW: Ticker, Sector & Update Status (Isolated from the title!) */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
                   <span className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold tracking-widest">{result.ticker}</span>
                   <span className="text-xs text-text-dim uppercase tracking-wider">{result.sector}</span>
                 </div>
-                <h2 className="font-serif text-4xl md:text-5xl text-white leading-tight">{result.companyName}</h2>
-              </div>
-              
-              {/* Added w-full on mobile to allow the inner elements to stretch */}
-              <div className="w-full md:w-auto text-left md:text-right flex flex-col md:items-end">
-                
-                {/* WIDER, JUSTIFY-BETWEEN CONTAINER FOR MOBILE */}
-                <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3 mb-5 md:mb-6 text-xs text-text-dim bg-white/5 px-4 md:px-3 py-2 md:py-1.5 rounded-lg border border-white/5">
+
+                <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3 text-xs text-text-dim bg-white/5 px-4 md:px-3 py-2 md:py-1.5 rounded-lg border border-white/5 shrink-0">
                   <div className="flex items-center gap-2">
                     <span>Updated {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
                     {isCached && <span className="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[10px] font-bold tracking-wider">CACHED</span>}
@@ -460,11 +456,20 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              </div>
 
-                <p className="text-text-dim text-xs uppercase tracking-widest mb-1 md:mb-2">Market Price</p>
-                <div className="font-serif text-3xl md:text-4xl text-white">
-                  <span className="text-2xl md:text-3xl text-accent mr-2 font-serif">Rp</span>
-                  {result.price.toLocaleString('id-ID')}
+              {/* BOTTOM ROW: Company Name & Market Price */}
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-2 md:mt-0">
+                <h2 className="font-serif text-4xl md:text-5xl text-white leading-tight max-w-3xl">
+                  {result.companyName}
+                </h2>
+                
+                <div className="text-left md:text-right shrink-0 mt-2 md:mt-0">
+                  <p className="text-text-dim text-xs uppercase tracking-widest mb-1 md:mb-2">Market Price</p>
+                  <div className="font-serif text-3xl md:text-4xl text-white">
+                    <span className="text-2xl md:text-3xl text-accent mr-2 font-serif">Rp</span>
+                    {result.price.toLocaleString('id-ID')}
+                  </div>
                 </div>
               </div>
             </div>
