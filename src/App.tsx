@@ -397,6 +397,9 @@ export default function App() {
                           <ArrowRight className="w-4 h-4 text-white/0 group-hover/item:text-accent shrink-0 transition-all -translate-x-4 group-hover/item:translate-x-0" />
                        </button>
                     ))}
+                    <div className="px-5 md:px-6 py-3 bg-white/2.5 border-t border-border-subtle text-xs text-text-dim italic">
+                      Results shown are top stocks only — if u can find it in IDX you can find it here.
+                    </div>
                  </div>
               )}
             </div>
