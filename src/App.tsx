@@ -350,24 +350,26 @@ export default function App() {
           
           <form onSubmit={analyzeStock} className={cn("relative w-full z-20", !result ? "animate-fade-in" : "")}>
             <div className="relative group shadow-2xl shadow-black/50" ref={suggestionRef}>
-              <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                {loading ? <Loader2 className="w-5 h-5 text-accent animate-spin" /> : <Search className="w-5 h-5 text-text-dim group-focus-within:text-white transition-colors" />}
+              <div className="absolute inset-y-0 left-5 md:left-6 flex items-center pointer-events-none">
+                {loading ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-accent animate-spin" /> : <Search className="w-4 h-4 md:w-5 md:h-5 text-text-dim group-focus-within:text-white transition-colors" />}
               </div>
               <input
                 type="text"
                 value={ticker}
                 onChange={(e) => { setTicker(e.target.value.toUpperCase()); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
-                placeholder="Enter ticker symbol (e.g., BBCA)"
-                className="w-full bg-surface border border-border-subtle rounded-full py-5 pl-14 pr-32 text-white placeholder:text-text-dim/50 focus:outline-none focus:border-accent/50 focus:bg-white/5 transition-all uppercase tracking-widest text-lg shadow-inner"
+                placeholder="Enter ticker symbol (e.g. BBCA)"
+                // Text base on mobile, text-lg on desktop. Adjusted padding to prevent squishing.
+                className="w-full bg-surface border border-border-subtle rounded-full py-4 md:py-5 pl-12 md:pl-14 pr-[110px] md:pr-32 text-white placeholder:text-text-dim/50 focus:outline-none focus:border-accent/50 focus:bg-white/5 transition-all uppercase tracking-widest text-base md:text-lg shadow-inner"
                 disabled={loading}
               />
               <button
                 type="submit"
                 disabled={loading || !ticker.trim()}
-                className="absolute right-2 top-2 bottom-2 bg-accent text-black hover:bg-accent/90 disabled:bg-accent/20 disabled:text-accent/50 px-6 rounded-full font-bold text-sm tracking-wide transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                // Tighter padding and smaller text/icon on mobile
+                className="absolute right-1.5 md:right-2 top-1.5 md:top-2 bottom-1.5 md:bottom-2 bg-accent text-black hover:bg-accent/90 disabled:bg-accent/20 disabled:text-accent/50 px-5 md:px-6 rounded-full font-bold text-xs md:text-sm tracking-wide transition-all flex items-center gap-1.5 md:gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
               >
-                Analyze {<ArrowRight className="w-4 h-4" />}
+                Analyze {<ArrowRight className="w-3 h-3 md:w-4 md:h-4" />}
               </button>
 
               {/* Suggestions Flyout */}
@@ -376,14 +378,14 @@ export default function App() {
                     {filteredStocks.slice(0, 5).map((stock) => (
                        <button 
                          key={stock.ticker} type="button"
-                         className="w-full text-left px-6 py-4 hover:bg-white/5 border-b border-border-subtle last:border-0 transition-colors flex items-center justify-between group/item"
+                         className="w-full text-left px-5 md:px-6 py-3 md:py-4 hover:bg-white/5 border-b border-border-subtle last:border-0 transition-colors flex items-center justify-between group/item"
                          onClick={() => handleSelectSuggestion(stock.ticker)}
                        >
-                          <div className="flex flex-col">
+                          <div className="flex flex-col pr-4">
                             <span className="font-bold text-white tracking-widest text-sm">{stock.ticker}</span>
-                            <span className="text-xs text-text-dim mt-0.5">{stock.name}</span>
+                            <span className="text-xs text-text-dim mt-0.5 truncate">{stock.name}</span>
                           </div>
-                          <ArrowRight className="w-4 h-4 text-white/0 group-hover/item:text-accent transition-all -translate-x-4 group-hover/item:translate-x-0" />
+                          <ArrowRight className="w-4 h-4 text-white/0 group-hover/item:text-accent shrink-0 transition-all -translate-x-4 group-hover/item:translate-x-0" />
                        </button>
                     ))}
                  </div>
@@ -420,31 +422,35 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-white/10">
               <div>
                 <div className="flex items-center gap-3 mb-3">
-                  {/* TICKER NAME MADE GREEN */}
                   <span className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold tracking-widest">{result.ticker}</span>
                   <span className="text-xs text-text-dim uppercase tracking-wider">{result.sector}</span>
                 </div>
                 <h2 className="font-serif text-4xl md:text-5xl text-white leading-tight">{result.companyName}</h2>
               </div>
               
-              <div className="text-left md:text-right flex flex-col md:items-end">
-                <div className="flex items-center gap-3 mb-4 md:mb-6 text-xs text-text-dim bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
-                  <span>Updated {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
-                  {/* CACHED BUTTON MADE GREEN */}
-                  {isCached && <span className="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[10px] font-bold tracking-wider">CACHED</span>}
-                  <span className="text-white/20">•</span>
-                  <button
-                    onClick={() => { clearCache(result.ticker); analyzeStock(); }}
-                    disabled={loading}
-                    className="text-white hover:text-accent transition-colors underline underline-offset-4"
-                  >
-                    {loading ? 'Updating...' : 'Refresh'}
-                  </button>
+              {/* Added w-full on mobile to allow the inner elements to stretch */}
+              <div className="w-full md:w-auto text-left md:text-right flex flex-col md:items-end">
+                
+                {/* WIDER, JUSTIFY-BETWEEN CONTAINER FOR MOBILE */}
+                <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3 mb-5 md:mb-6 text-xs text-text-dim bg-white/5 px-4 md:px-3 py-2 md:py-1.5 rounded-lg border border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span>Updated {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
+                    {isCached && <span className="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[10px] font-bold tracking-wider">CACHED</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/20 hidden md:inline">•</span>
+                    <button
+                      onClick={() => { clearCache(result.ticker); analyzeStock(); }}
+                      disabled={loading}
+                      className="text-white hover:text-accent transition-colors underline underline-offset-4 font-medium"
+                    >
+                      {loading ? 'Updating...' : 'Refresh'}
+                    </button>
+                  </div>
                 </div>
 
-                <p className="text-text-dim text-xs uppercase tracking-widest mb-2">Market Price</p>
+                <p className="text-text-dim text-xs uppercase tracking-widest mb-1 md:mb-2">Market Price</p>
                 <div className="font-serif text-3xl md:text-4xl text-white">
-                  {/* Rp MADE GREEN */}
                   <span className="text-2xl md:text-3xl text-accent mr-2 font-serif">Rp</span>
                   {result.price.toLocaleString('id-ID')}
                 </div>
@@ -480,7 +486,7 @@ export default function App() {
                     </div>
                     <div className="text-4xl md:text-5xl font-serif text-white">
                       {/* x is bigger */}
-                      {result.pbv.toFixed(2)}<span className="text-3xl md:text-4xl text-accent ml-2 font-serif">x</span>
+                      {result.pbv.toFixed(2)}<span className="text-4xl text-accent ml-2 font-serif">x</span>
                     </div>
                   </div>
                 );
@@ -490,42 +496,24 @@ export default function App() {
             {/* AI Analysis Section */}
             <div className="glass-panel overflow-hidden mt-4">
               {/* Analysis Header & Sentiment */}
-              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div className="flex items-center gap-4 shrink-0">
-                  <div className="p-2 bg-white/10 rounded-lg text-white"><TrendingUp className="w-5 h-5" /></div>
-                  <div>
-                    <h3 className="text-white font-medium">AI Synthesis</h3>
-                    <p className="text-xs text-text-dim mt-1">Generated by Gemini & HuggingFace Models</p>
+              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col gap-5">
+                
+                {/* TOP ROW: Title (Left) & Sentiment Pill (Right) */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {/* AI Synthesis (Very Left) */}
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="p-2 bg-white/10 rounded-lg text-white"><TrendingUp className="w-5 h-5" /></div>
+                    <div>
+                      <h3 className="text-white font-medium">AI Synthesis</h3>
+                      <p className="text-xs text-text-dim mt-1">Generated by Gemini & HuggingFace Models</p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Sentiment Readout & Explanation (Responsive Layout) */}
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4 w-full lg:justify-end">
-                  {sentimentState === 'success' && sentimentData ? (
-                    <>
-                      {/* Premium Sentiment Explanation Box */}
-                      <div className="flex flex-col bg-gradient-to-br from-white/[0.04] to-transparent p-5 md:p-6 rounded-2xl border border-white/10 max-w-md lg:text-right order-2 lg:order-1 shadow-2xl backdrop-blur-md transition-all">
-                        <div className="text-[13px] md:text-sm text-white/90 leading-relaxed font-medium">
-                          {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
-                            <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
-                          ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
-                            <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
-                          ) : (
-                            <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
-                          )}
-                        </div>
-                        
-                        {/* Elegant separator line */}
-                        <div className="mt-4 pt-3 border-t border-white/10">
-                          <p className="text-xs text-text-dim/80 leading-relaxed">
-                            Percentage score indicated the AI's level of confidence in the sentiment classification.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Sentiment Pill (Right on Desktop, Top on Mobile) */}
+                  {/* Market Sentiment Pill (Right of AI Synthesis) */}
+                  <div>
+                    {sentimentState === 'success' && sentimentData ? (
                       <div className={cn(
-                        "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md w-fit shrink-0 order-1 lg:order-2",
+                        "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md w-fit",
                         sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
                         sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
                         "bg-blue-500/10 border-blue-500/20 text-blue-400"
@@ -540,15 +528,34 @@ export default function App() {
                           </span>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs text-text-dim mt-2">
-                      {sentimentState === 'loading' && <><Loader2 className="w-3 h-3 animate-spin" /> Processing NLP...</>}
-                      {sentimentState === 'warming_up' && <span className="text-amber-500">Warming up Model...</span>}
-                      {sentimentState === 'error' && <span>Sentiment Unavailable</span>}
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-text-dim">
+                        {sentimentState === 'loading' && <><Loader2 className="w-3 h-3 animate-spin" /> Processing NLP...</>}
+                        {sentimentState === 'warming_up' && <span className="text-amber-500">Warming up Model...</span>}
+                        {sentimentState === 'error' && <span>Sentiment Unavailable</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* BOTTOM ROW: Full-width explanation text */}
+                {sentimentState === 'success' && sentimentData && (
+                  <div className="pt-4 border-t border-white/10 flex flex-col gap-2">
+                    <div className="text-sm text-white/80 leading-relaxed font-sans">
+                      {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                        <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
+                      ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                        <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
+                      ) : (
+                        <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
+                      )}
+                    </div>
+                    {/* Small explainer text at the very bottom */}
+                    <p className="text-xs text-text-dim/60 font-sans">
+                      Percentage score indicates the AI's level of confidence in the sentiment classification.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Analysis Content */}
