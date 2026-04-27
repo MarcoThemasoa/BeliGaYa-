@@ -331,18 +331,20 @@ export default function App() {
 
       <main className={cn(
         "flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-12 flex flex-col",
-        !result ? "justify-center" : "py-12 gap-10"
+        !result ? "" : "py-12 gap-10"
       )}>
         
         {/* Elegant Search / Hero */}
         <div className={cn(
           "transition-all duration-700 ease-out w-full", 
-          !result ? "max-w-2xl mx-auto text-center pb-40" : ""
+          // mt-[15vh] visually centers it without flexbox jumping
+          // pb-[320px] physically reserves empty space for the absolute dropdown so it PUSHES the footer down
+          !result ? "max-w-2xl mx-auto text-center mt-[12vh] md:mt-[15vh] pb-[320px]" : ""
         )}>
           {!result && (
             <div className="animate-fade-in mb-10">
               <h1 className="font-serif text-4xl md:text-5xl text-white mb-4 tracking-tight">Financial Clarity,<br/>Powered by AI.</h1>
-              <p className="text-text-dim text-base md:text-lg">Parse fundamental Indonesian Stocks P/BV data and synthesize market context instantly.</p>
+              <p className="text-text-dim text-base md:text-lg">Parse fundamental P/BV data and synthesize market context instantly.</p>
             </div>
           )}
           
@@ -363,7 +365,7 @@ export default function App() {
               <button
                 type="submit"
                 disabled={loading || !ticker.trim()}
-                className="absolute right-2 top-2 bottom-2 bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-white/30 px-6 rounded-full font-medium text-sm tracking-wide transition-all flex items-center gap-2"
+                className="absolute right-2 top-2 bottom-2 bg-accent text-black hover:bg-accent/90 disabled:bg-accent/20 disabled:text-accent/50 px-6 rounded-full font-bold text-sm tracking-wide transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
               >
                 Analyze {<ArrowRight className="w-4 h-4" />}
               </button>
@@ -418,17 +420,18 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-white/10">
               <div>
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="px-3 py-1 rounded-full bg-white/10 text-white text-xs font-semibold tracking-widest">{result.ticker}</span>
+                  {/* TICKER NAME MADE GREEN */}
+                  <span className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold tracking-widest">{result.ticker}</span>
                   <span className="text-xs text-text-dim uppercase tracking-wider">{result.sector}</span>
                 </div>
                 <h2 className="font-serif text-4xl md:text-5xl text-white leading-tight">{result.companyName}</h2>
               </div>
               
               <div className="text-left md:text-right flex flex-col md:items-end">
-                {/* MOVED TO TOP: Timestamp & Refresh Button */}
                 <div className="flex items-center gap-3 mb-4 md:mb-6 text-xs text-text-dim bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
                   <span>Updated {formatLastAnalyzedTime(result.lastAnalyzedTime)}</span>
-                  {isCached && <span className="px-1.5 py-0.5 rounded bg-white/10 text-white text-[10px] font-medium tracking-wider">CACHED</span>}
+                  {/* CACHED BUTTON MADE GREEN */}
+                  {isCached && <span className="px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/30 text-[10px] font-bold tracking-wider">CACHED</span>}
                   <span className="text-white/20">•</span>
                   <button
                     onClick={() => { clearCache(result.ticker); analyzeStock(); }}
@@ -440,8 +443,9 @@ export default function App() {
                 </div>
 
                 <p className="text-text-dim text-xs uppercase tracking-widest mb-2">Market Price</p>
-                <div className="font-serif text-3xl md:text-4xl text-accent">
-                  <span className="text-xl text-accent/70 mr-1">Rp</span>
+                <div className="font-serif text-3xl md:text-4xl text-white">
+                  {/* Rp MADE GREEN */}
+                  <span className="text-xl text-accent mr-1 font-sans font-medium">Rp</span>
                   {result.price.toLocaleString('id-ID')}
                 </div>
               </div>
@@ -455,7 +459,8 @@ export default function App() {
                   <Banknote className="w-4 h-4" /> Book Value Per Share
                 </div>
                 <div className="text-3xl font-serif text-white">
-                  <span className="text-xl text-white/50 mr-1">Rp</span>
+                  {/* Rp MADE GREEN */}
+                  <span className="text-xl text-accent mr-1 font-sans font-medium">Rp</span>
                   {result.bvps > 0 && result.bvps < 1 ? result.bvps.toFixed(3) : Math.round(result.bvps).toLocaleString('id-ID')}
                 </div>
               </div>
@@ -474,7 +479,8 @@ export default function App() {
                       </span>
                     </div>
                     <div className="text-4xl font-serif text-white">
-                      {result.pbv.toFixed(2)}<span className="text-2xl text-white/50 ml-1">x</span>
+                      {/* x MADE GREEN */}
+                      {result.pbv.toFixed(2)}<span className="text-2xl text-accent ml-1 font-sans font-medium">x</span>
                     </div>
                   </div>
                 );
@@ -484,8 +490,8 @@ export default function App() {
             {/* AI Analysis Section */}
             <div className="glass-panel overflow-hidden mt-4">
               {/* Analysis Header & Sentiment */}
-              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-                <div className="flex items-center gap-4 mt-1">
+              <div className="bg-white/5 p-6 border-b border-border-subtle flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex items-center gap-4 shrink-0">
                   <div className="p-2 bg-white/10 rounded-lg text-white"><TrendingUp className="w-5 h-5" /></div>
                   <div>
                     <h3 className="text-white font-medium">AI Synthesis</h3>
@@ -493,12 +499,24 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Sentiment Readout & Explanation */}
-                <div className="flex flex-col lg:items-end gap-3 max-w-sm">
+                {/* Sentiment Readout & Explanation (Responsive Layout) */}
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4 w-full lg:justify-end">
                   {sentimentState === 'success' && sentimentData ? (
                     <>
+                      {/* Sentiment Explanation (Left on Desktop, Bottom on Mobile) */}
+                      <div className="text-xs text-text-dim leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5 max-w-sm lg:text-right order-2 lg:order-1">
+                        {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
+                          <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
+                        ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
+                          <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
+                        ) : (
+                          <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
+                        )}
+                      </div>
+
+                      {/* Sentiment Pill (Right on Desktop, Top on Mobile) */}
                       <div className={cn(
-                        "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md w-fit",
+                        "flex items-center gap-3 px-4 py-2 rounded-xl border backdrop-blur-md w-fit shrink-0 order-1 lg:order-2",
                         sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
                         sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
                         "bg-blue-500/10 border-blue-500/20 text-blue-400"
@@ -512,18 +530,6 @@ export default function App() {
                             {' '}({Math.round(sentimentData.score * 100)}%)
                           </span>
                         </div>
-                      </div>
-
-                      {/* BROUGHT BACK: Sentiment Explanation Block */}
-                      <div className="text-xs text-text-dim leading-relaxed lg:text-right bg-white/[0.02] p-3 rounded-lg border border-white/5">
-                        {sentimentData.label?.includes('POSITIVE') || sentimentData.label === 'LABEL_2' ? (
-                          <p>Indicates a favorable outlook, growth potential, or dominant positive catalysts. Research further before investing.</p>
-                        ) : sentimentData.label?.includes('NEGATIVE') || sentimentData.label === 'LABEL_0' ? (
-                          <p>Indicates elevated risks, potential downturns, or dominant negative catalysts. Exercise caution.</p>
-                        ) : (
-                          <p>Indicates a balanced outlook with offsetting positive and negative factors. Await clearer signals.</p>
-                        )}
-                        <p className="text-[10px] opacity-60 mt-2">Percentage indicates the AI model's confidence score.</p>
                       </div>
                     </>
                   ) : (
