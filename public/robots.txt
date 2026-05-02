@@ -1,0 +1,18 @@
+# Allow all search engines to crawl the site
+User-agent: *
+
+# Protect sensitive API routes and internal logic
+Disallow: /api/
+Disallow: /src/
+Disallow: /tsconfig.json
+Disallow: /package.json
+Disallow: /package-lock.json
+Disallow: /vercel.json
+Disallow: /vite.config.ts
+
+# Allow crawling of the main entry point and static assets
+Allow: /index.html
+Allow: /favicon.ico
+
+# Sitemap (Update this URL once you generate a sitemap.xml)
+# Sitemap: https://yourdomain.com/sitemap.xml
